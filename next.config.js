@@ -6,6 +6,7 @@ const nextConfig = {
     ? {
         output: "export",
         basePath: "/baraka",
+        trailingSlash: true,
       }
     : {}),
   distDir: process.env.NEXT_DIST_DIR || ".next",

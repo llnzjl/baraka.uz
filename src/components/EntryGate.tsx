@@ -64,10 +64,10 @@ export default function EntryGate({ children }: { children: ReactNode }) {
       saveApiSessionToken(d.accessToken || null);
       setSession(d);
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-      if (kind === "owner") window.location.assign(`${basePath}/admin/reservations`);
+      if (kind === "owner") window.location.assign(`${basePath}/admin/reservations/`);
       else
         window.location.assign(
-          `${basePath}/guest/profile?next=` +
+          `${basePath}/guest/profile/?next=` +
             encodeURIComponent(path + window.location.search),
         );
     } catch (e) {
