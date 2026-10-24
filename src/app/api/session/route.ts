@@ -1,7 +1,7 @@
 import { sessionView, changeGuestName } from "@/lib/booking/guest-profile";
 import { guestProfileSchema } from "@/lib/booking/validation";
 import { z } from "zod";
-import { handle, body, origin, limit, clientIp } from "@/lib/booking/http";
+import { handle, body, origin, limit, clientIp, response } from "@/lib/booking/http";
 import {
   newSession,
   readSession,
@@ -46,14 +46,11 @@ export async function POST(request: Request) {
     token = created.token;
     return sessionView(created.session);
   });
-  if (token)
-    result.cookies.set(sessionCookie, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/",
-      maxAge: 28800,
-    });
+  if (token && process.env.BARAKA_EDGE === "true") {
+    const view = await result.json();
+    return response({ ...view, accessToken: token });
+  }
+  if (token) result.headers.append("Set-Cookie", `${sessionCookie}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800${process.env.NODE_ENV === "production" ? "; Secure" : ""}`);
   return result;
 }
 export async function DELETE(request: Request) {
@@ -62,14 +59,7 @@ export async function DELETE(request: Request) {
     await endSession(requestToken(request));
     return { ok: true };
   });
-  if (result.ok)
-    result.cookies.set(sessionCookie, "", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/",
-      maxAge: 0,
-    });
+  if (result.ok && process.env.BARAKA_EDGE !== "true") result.headers.append("Set-Cookie", `${sessionCookie}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${process.env.NODE_ENV === "production" ? "; Secure" : ""}`);
   return result;
 }
 

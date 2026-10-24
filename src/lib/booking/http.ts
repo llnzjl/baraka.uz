@@ -1,15 +1,15 @@
 import { readSession, requestToken } from "./sessions";
-import "server-only";
 import { createHmac, timingSafeEqual } from "crypto";
-import { NextResponse } from "next/server";
 import { z } from "zod";
 import { database } from "./db";
 import { BookingError } from "./validation";
+import { isIP } from "node:net";
 
 export function response(data: unknown, status = 200) {
-  return NextResponse.json(data, {
+  return new Response(JSON.stringify(data), {
     status,
     headers: {
+      "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store, private",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "no-referrer",
@@ -76,12 +76,16 @@ export function clientIp(request: Request) {
   if (!header && process.env.NODE_ENV === "production")
     throw new BookingError("UNAVAILABLE", 503);
   // Configure a header overwritten by the deployment's trusted reverse proxy, never arbitrary forwarded headers.
-  return header
-    ? (request.headers.get(header) || "unknown")
-        .split(",")[0]
-        .trim()
-        .slice(0, 100)
-    : "local";
+  if (!header) return "local";
+  // Proxies append the connected client address to X-Forwarded-For. Prefer
+  // the last valid hop so a caller cannot choose a rate-limit bucket by
+  // prepending a forged address. A proxy that overwrites the field yields one.
+  const chain = request.headers.get(header)?.split(",") || [];
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const candidate = chain[i].trim();
+    if (candidate.length <= 45 && isIP(candidate)) return candidate;
+  }
+  return "unknown";
 }
 export async function limit(
   scope: string,

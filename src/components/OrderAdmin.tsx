@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import OwnerTabs from "./OwnerTabs";
 import { seoulDate } from "@/lib/booking/validation";
 import type { DiningOrder } from "@/lib/orders/validation";
+import { apiFetch, downloadApiFile } from "@/lib/client/api";
 const labels: Record<string, string> = {
   queued: "Received",
   preparing: "Preparing",
@@ -29,7 +30,7 @@ export default function OrderAdmin() {
     if (history && !date) return;
     const id = ++sequence.current;
     try {
-      const r = await fetch(
+      const r = await apiFetch(
         "/api/admin/orders" + (history ? `?date=${date}` : ""),
         { cache: "no-store" },
       );
@@ -81,7 +82,7 @@ export default function OrderAdmin() {
     setBusy(order.id);
     setError("");
     try {
-      const r = await fetch(`/api/admin/orders/${order.id}`, {
+      const r = await apiFetch(`/api/admin/orders/${order.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, version: order.version }),
@@ -135,16 +136,15 @@ export default function OrderAdmin() {
           </label>
         )}
         <button onClick={() => void refresh()}>Refresh</button>
-        <a
+        <button
           className="text-link"
-          href="/api/admin/orders/records"
-          download="orders.txt"
+          onClick={() => void downloadApiFile("/api/admin/orders/records", "orders.txt").catch(() => setError("Download unavailable"))}
         >
           Download orders (.txt)
-        </a>
-        <a className="text-link" href="/api/admin/orders/receipts" download="receipts.txt">
+        </button>
+        <button className="text-link" onClick={() => void downloadApiFile("/api/admin/orders/receipts", "receipts.txt").catch(() => setError("Download unavailable"))}>
           Download meal receipts (.txt)
-        </a>
+        </button>
         <small>
           {updated
             ? `Updated ${updated} KST · refreshes every 3 seconds`

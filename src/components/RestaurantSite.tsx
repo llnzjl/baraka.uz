@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight, ArrowRight, ArrowDown, Check, ChevronDown, Copy, Instagram, MapPin, Menu, Phone, Search, X, Clock, Utensils, Camera } from "./SiteIcons";
 import ReservationForm from "./ReservationForm";
 import SilkRoadSections from "./SilkRoadSections";
+import { apiFetch, apiUrl } from "@/lib/client/api";
 import { restaurant } from "@/data/restaurant";
 import { menuItems, type MenuItem, type Category } from "@/data/menu";
 
@@ -16,6 +17,8 @@ const publicAsset = (source: string) => {
   const prefix = process.env.NEXT_PUBLIC_BASE_PATH || "";
   return prefix && source.startsWith("/") ? `${prefix}${source}` : source;
 };
+const imageSource = (source: string) =>
+  source.startsWith("/api/") ? apiUrl(source) : publicAsset(source);
 const categories: { id: Category; en: string; ko: string }[] = [
   { id: "all", en: "All dishes", ko: "전체 메뉴" },
   { id: "mains", en: "Mains & noodles", ko: "메인 · 면" },
@@ -34,7 +37,7 @@ function DishPhoto({ item, path, language }: { item: MenuItem; path?: string; la
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [path]);
   return <div className={`dish-photo dish-photo--${item.category}`}>
-    {path && !failed ? <Image src={publicAsset(path)} alt={language === "ko" ? item.ko : item.name} fill sizes="(max-width: 640px) 90vw, (max-width: 1000px) 45vw, 30vw" onError={() => setFailed(true)} /> : <>
+    {path && !failed ? <Image src={imageSource(path)} alt={language === "ko" ? item.ko : item.name} fill sizes="(max-width: 640px) 90vw, (max-width: 1000px) 45vw, 30vw" onError={() => setFailed(true)} /> : <>
       <div className="plate-art" aria-hidden="true"><span /><Utensils size={34} /></div>
       <span className="photo-soon"><Camera size={13} />{language === "ko" ? "사진 준비 중" : "A photo is on its way"}</span>
     </>}
@@ -68,14 +71,9 @@ export default function RestaurantSite({ menuPhotos = {} }: Props) {
   }, []);
   useEffect(() => {
     let alive = true;
-    if (process.env.NEXT_PUBLIC_GITHUB_PAGES === "true") {
-      return () => {
-        alive = false;
-      };
-    }
     const refresh = async () => {
       try {
-        const response = await fetch("/api/menu", { cache: "no-store" });
+        const response = await apiFetch("/api/menu", { cache: "no-store" });
         if (!response.ok) return;
         const data = await response.json();
         if (alive && Array.isArray(data.items)) {
@@ -144,7 +142,7 @@ export default function RestaurantSite({ menuPhotos = {} }: Props) {
     form.set("image",file,file.name);
     setPhotoMessage(old => ({...old,[item.id]:t("Saving photo…","사진 저장 중…")}));
     try {
-      const response = await fetch(`/api/admin/menu/${encodeURIComponent(item.id)}`,{method:"PATCH",body:form});
+      const response = await apiFetch(`/api/admin/menu/${encodeURIComponent(item.id)}`,{method:"PATCH",body:form});
       const data = await response.json();
       if (!response.ok) throw new Error(data.error === "INVALID_IMAGE" ? t("Choose a JPEG, PNG or WebP photo.","JPEG, PNG or WebP photo.") : data.error === "IMAGE_TOO_LARGE" ? t("Photo must be at most 100 MB and 100 megapixels.","Photo must be at most 100 MB and 100 megapixels.") : t("The photo could not be saved.","The photo could not be saved."));
       setMenu(old => old.map(entry => entry.id === item.id ? {...entry,...data.item} : entry));

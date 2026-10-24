@@ -65,6 +65,10 @@ export async function readSession(
   return r.rows[0] || null;
 }
 export function requestToken(request: Request) {
+  if (process.env.BARAKA_EDGE === "true") {
+    const bearer = request.headers.get("authorization")?.match(/^Bearer ([a-f0-9]{64})$/)?.[1];
+    if (bearer) return bearer;
+  }
   return request.headers
     .get("cookie")
     ?.split(";")

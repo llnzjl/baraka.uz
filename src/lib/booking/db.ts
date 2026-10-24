@@ -6,9 +6,9 @@ export function database() {
   if (!globalDb.bookingPool)
     globalDb.bookingPool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      max: 5,
+      max: process.env.BARAKA_EDGE === "true" ? 1 : 5,
       connectionTimeoutMillis: 5000,
-      idleTimeoutMillis: 20000,
+      idleTimeoutMillis: process.env.BARAKA_EDGE === "true" ? 5000 : 20000,
       statement_timeout: 10000,
       application_name: "baraka-booking",
     });

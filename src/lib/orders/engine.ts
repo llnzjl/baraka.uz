@@ -222,7 +222,7 @@ export async function changeOrderStatus(
       await c.query(
         `INSERT INTO booking.order_receipts(order_id,reference,table_name,guest_number,guest_name,items,estimated_total,served_at,purge_at)
          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(order_id) DO NOTHING`,
-        [r.id, r.reference, r.table_name, r.guest_number, r.guest_name, r.items, r.estimated_total, updated.updated_at, r.purge_at],
+        [r.id, r.reference, r.table_name, r.guest_number, r.guest_name, JSON.stringify(r.items), r.estimated_total, updated.updated_at, r.purge_at],
       );
     }
     await c.query(

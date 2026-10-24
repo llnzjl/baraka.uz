@@ -6,6 +6,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { configSchema, seoulDate, clock } from "@/lib/booking/validation";
 import BookingForm from "./BookingForm";
+import { apiFetch, downloadApiFile } from "@/lib/client/api";
 type Config = z.infer<typeof configSchema>;
 type Reservation = {
   id: string;
@@ -73,7 +74,7 @@ export default function ReservationAdmin() {
   const refreshSequence = useRef(0);
   const api = useCallback(
     async (path: string, method = "GET", payload?: unknown) => {
-      const r = await fetch(path, {
+      const r = await apiFetch(path, {
         method,
         headers: {
           ...(payload ? { "Content-Type": "application/json" } : {}),
@@ -231,13 +232,12 @@ export default function ReservationAdmin() {
           </label>
           <button onClick={() => void refresh()}>Refresh</button>
           {authorized && (
-            <a
+            <button
               className="text-link"
-              href="/api/admin/reservations/records"
-              download="reservations.txt"
+              onClick={() => void downloadApiFile("/api/admin/reservations/records", "reservations.txt").catch(() => setError("Download unavailable"))}
             >
               Download reservation records (.txt)
-            </a>
+            </button>
           )}
           {authorized && (
             <button onClick={() => setManual(!manual)}>
@@ -249,8 +249,11 @@ export default function ReservationAdmin() {
           )}
           <button
             onClick={() =>
-              void fetch("/api/session", { method: "DELETE" }).then((r) => {
-                if (r.ok) window.location.assign("/");
+              void apiFetch("/api/session", { method: "DELETE" }).then((r) => {
+                if (r.ok) {
+                  localStorage.removeItem("baraka-session-token");
+                  window.location.assign(`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/`);
+                }
                 else setError("Sign out failed. Please retry.");
               })
             }

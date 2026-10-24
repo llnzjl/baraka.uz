@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import OwnerTabs from "./OwnerTabs";
+import { apiFetch } from "@/lib/client/api";
 type MenuItem = { id:string; name:string; ko:string; category:string; description:string; descriptionKo:string; price:number|null; active:boolean; image:string; updatedAt:string };
 const categories = [
   ["mains","Mains & noodles"],["grill","Grill"],["soups","Soups"],
@@ -14,7 +15,7 @@ export default function MenuAdmin() {
   const dirty=useRef(new Set<string>()), versions=useRef<Record<string,number>>({});
   const load=useCallback(async()=>{
     try {
-      const r=await fetch("/api/admin/menu",{cache:"no-store"});
+      const r=await apiFetch("/api/admin/menu",{cache:"no-store"});
       if(!r.ok) throw new Error(r.status===401?"Sign in again to edit the menu.":"The menu could not load.");
       const d=await r.json(); setItems(d.items); setLoaded(true); setError("");
     } catch(e) { setError((e as Error).message); }
@@ -43,7 +44,7 @@ export default function MenuAdmin() {
     form.set("item",JSON.stringify({id:item.id,name:item.name,ko:item.ko,category:item.category,description:item.description,descriptionKo:item.descriptionKo,price:item.price,active:item.active}));
     if(file) form.set("image",file,file.name);
     try {
-      const r=await fetch(`/api/admin/menu/${encodeURIComponent(id)}`,{method:"PATCH",body:form});
+      const r=await apiFetch(`/api/admin/menu/${encodeURIComponent(id)}`,{method:"PATCH",body:form});
       const d=await r.json(); if(!r.ok) throw new Error(d.error==="IMAGE_TOO_LARGE"?"Photo must be at most 100 MB and 100 megapixels.":d.error==="INVALID_IMAGE"?"Use a valid JPEG, PNG or WebP image.":"Could not save this dish. Check the fields and try again.");
       if((versions.current[id]||0)===version){
         setItems(old=>old.map(x=>x.id===id?d.item:x));
@@ -63,7 +64,7 @@ export default function MenuAdmin() {
     const form=new FormData();
     form.set("item",JSON.stringify({name:"New dish",ko:"새 메뉴",category:"mains",description:"",descriptionKo:"",price:null,active:true}));
     try {
-      const r=await fetch("/api/admin/menu",{method:"POST",body:form}), d=await r.json();
+      const r=await apiFetch("/api/admin/menu",{method:"POST",body:form}), d=await r.json();
       if(!r.ok)throw new Error("Could not add the dish. Refresh and try again.");
       setItems(old=>[d.item,...old]); setStates(old=>({...old,[d.item.id]:"Saved"}));
     }catch(e){setError((e as Error).message);}

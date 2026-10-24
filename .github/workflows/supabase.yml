@@ -1,0 +1,98 @@
+name: Deploy Baraka backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/app/api/**"
+      - "src/lib/booking/**"
+      - "src/lib/menu/**"
+      - "supabase/**"
+      - "db/migrations/**"
+      - ".github/workflows/supabase.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: baraka-supabase-production
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check Supabase API
+        run: deno check --config supabase/functions/deno.json supabase/functions/baraka-api/index.ts
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+      OWNER_USERNAME: ${{ secrets.OWNER_USERNAME }}
+      OWNER_PASSWORD_HASH: ${{ secrets.OWNER_PASSWORD_HASH }}
+      RATE_LIMIT_SECRET: ${{ secrets.RATE_LIMIT_SECRET }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+      PRIVACY_CONTROLLER: ${{ secrets.PRIVACY_CONTROLLER }}
+      PRIVACY_CONTACT: ${{ secrets.PRIVACY_CONTACT }}
+      PRIVACY_POLICY_URL: ${{ secrets.PRIVACY_POLICY_URL }}
+      APP_ORIGIN: https://llnzjl.github.io
+      TRUSTED_IP_HEADER: x-forwarded-for
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Check required configuration
+        id: config
+        shell: bash
+        run: |
+          missing=0
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_ID DATABASE_URL MIGRATION_DATABASE_URL OWNER_USERNAME OWNER_PASSWORD_HASH RATE_LIMIT_SECRET CRON_SECRET TURNSTILE_SECRET_KEY NEXT_PUBLIC_TURNSTILE_SITE_KEY PRIVACY_CONTROLLER PRIVACY_CONTACT PRIVACY_POLICY_URL; do
+            if [[ -z "${!name}" ]]; then echo "::warning::Missing $name; Supabase deployment is skipped until the project settings are configured."; missing=1; fi
+          done
+          if [[ "$missing" == 0 ]]; then echo "configured=true" >> "$GITHUB_OUTPUT"; else echo "configured=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Install dependencies
+        if: steps.config.outputs.configured == 'true'
+        run: npm ci
+      - uses: supabase/setup-cli@v1
+        if: steps.config.outputs.configured == 'true'
+        with:
+          version: latest
+      - name: Write private environment files
+        if: steps.config.outputs.configured == 'true'
+        shell: bash
+        run: |
+          umask 077
+          node <<'NODE'
+          const fs = require('node:fs');
+          const quote = (value) => JSON.stringify(value);
+          fs.writeFileSync(`${process.env.RUNNER_TEMP}/migration.env`, `MIGRATION_DATABASE_URL=${quote(process.env.MIGRATION_DATABASE_URL)}\n`, { mode: 0o600 });
+          const keys = ['DATABASE_URL', 'OWNER_USERNAME', 'OWNER_PASSWORD_HASH', 'RATE_LIMIT_SECRET', 'CRON_SECRET', 'TURNSTILE_SECRET_KEY', 'NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'PRIVACY_CONTROLLER', 'PRIVACY_CONTACT', 'PRIVACY_POLICY_URL', 'APP_ORIGIN', 'TRUSTED_IP_HEADER'];
+          fs.writeFileSync(`${process.env.RUNNER_TEMP}/runtime.env`, keys.map((key) => `${key}=${quote(process.env[key])}`).concat('NODE_ENV="production"').join('\n') + '\n', { mode: 0o600 });
+          NODE
+      - name: Apply database migrations
+        if: steps.config.outputs.configured == 'true'
+        run: node --env-file="$RUNNER_TEMP/migration.env" scripts/migrate.mjs
+      - name: Deploy Edge Function secrets and API
+        if: steps.config.outputs.configured == 'true'
+        shell: bash
+        run: |
+          supabase secrets set --project-ref "$SUPABASE_PROJECT_ID" --env-file "$RUNNER_TEMP/runtime.env"
+          supabase functions deploy baraka-api --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Remove private environment files
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/migration.env" "$RUNNER_TEMP/runtime.env"

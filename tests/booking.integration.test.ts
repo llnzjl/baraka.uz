@@ -483,7 +483,7 @@ test("owner profile updates persist details, change the sign-in name and preserv
   assert.equal((await readSession(current.token))?.kind, "owner");
 });
 
-test("24-hour service supports midnight crossings and respects next-day closures and allocations", async () => {
+test("10:00 to midnight booking window supports meals across midnight and respects next-day closures", async () => {
   await reset();
   await database().query("DELETE FROM booking.opening_hours");
   await database().query(
@@ -496,7 +496,7 @@ test("24-hour service supports midnight crossings and respects next-day closures
     (await availability(tomorrow, 2)).slots.includes("00:00"),
     false,
   );
-  assert.ok((await availability(tomorrow, 2)).slots.includes("01:00"));
+  assert.ok((await availability(tomorrow, 2)).slots.includes("10:00"));
   await saveConfig(await getConfig(), actor);
   await updateReservation(
     (

@@ -6,6 +6,7 @@ import { terminalStatus } from "@/lib/booking/status-copy";
 import { bookingCopy } from "@/lib/booking/copy";
 import { bookingSchema, Locale, seoulDate } from "@/lib/booking/validation";
 import styles from "./ReservationForm.module.css";
+import { apiFetch } from "@/lib/client/api";
 type Availability = {
   slots: string[];
   enabled: boolean;
@@ -148,7 +149,7 @@ export default function BookingForm({
     setLoading(true);
     setData(null);
     setTime("");
-    fetch(
+    apiFetch(
       `/api/reservations/availability?date=${encodeURIComponent(date)}&guests=${guests}`,
       { signal: controller.signal, cache: "no-store" },
     )
@@ -226,7 +227,7 @@ export default function BookingForm({
     }
     setBusy(true);
     try {
-      const r = await fetch(
+      const r = await apiFetch(
         adminMode ? "/api/admin/reservations" : "/api/reservations",
         {
           method: "POST",

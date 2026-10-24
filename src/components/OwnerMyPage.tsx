@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import OwnerTabs from "./OwnerTabs";
+import { apiFetch } from "@/lib/client/api";
 
 type Profile = { name: string; username: string; phone: string };
 
@@ -18,7 +19,7 @@ export default function OwnerMyPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    fetch("/api/admin/profile", { cache: "no-store" })
+    apiFetch("/api/admin/profile", { cache: "no-store" })
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error("Could not load owner details. Sign in again and retry.");
@@ -44,7 +45,7 @@ export default function OwnerMyPage() {
     }
     setBusy(true);
     try {
-      const response = await fetch("/api/admin/profile", {
+      const response = await apiFetch("/api/admin/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
@@ -68,7 +69,7 @@ export default function OwnerMyPage() {
     setMessage("");
     setBusy(true);
     try {
-      const response = await fetch("/api/admin/profile", {
+      const response = await apiFetch("/api/admin/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, name, phone }),

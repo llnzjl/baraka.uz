@@ -3,6 +3,7 @@ import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useEntrySession } from "./EntryGate";
 import type { DiningOrder } from "@/lib/orders/validation";
+import { apiFetch } from "@/lib/client/api";
 type Menu = {
   id: string;
   name: string;
@@ -61,7 +62,7 @@ export default function OrderPage() {
   }, []);
   const loadCatalog = useCallback(async () => {
     try {
-      const r = await fetch("/api/orders/catalog", { cache: "no-store" });
+      const r = await apiFetch("/api/orders/catalog", { cache: "no-store" });
       if (!r.ok) throw new Error();
       const next: Catalog = await r.json();
       setCatalog(next);
@@ -76,7 +77,7 @@ export default function OrderPage() {
   const refresh = useCallback(async () => {
     const id = ++refreshId.current;
     try {
-      const r = await fetch("/api/orders", { cache: "no-store" });
+      const r = await apiFetch("/api/orders", { cache: "no-store" });
       if (!r.ok) {
         if (r.status === 401) setOrders([]);
         return;
@@ -164,7 +165,7 @@ export default function OrderPage() {
     } catch {}
     setBusy(true);
     try {
-      const r = await fetch("/api/orders", {
+      const r = await apiFetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -106,6 +106,24 @@ export async function receiptsText(c: PoolClient) {
   ].join("\n");
 }
 export async function syncRecords(force = false) {
+  if (process.env.BARAKA_EDGE === "true") {
+    return transaction(async (c) => {
+      const state = (
+        await c.query("SELECT * FROM booking.records_export WHERE id=1 FOR UPDATE")
+      ).rows[0];
+      if (!state?.dirty && !force) return { synced: true };
+      const reservations = await recordsText(c);
+      const orders = await ordersText(c);
+      const receipts = await receiptsText(c);
+      await c.query(
+        `UPDATE booking.records_export
+         SET reservation_text=$1,orders_text=$2,receipts_text=$3,dirty=false,exported_at=now()
+         WHERE id=1`,
+        [reservations, orders, receipts],
+      );
+      return { synced: true };
+    });
+  }
   const target = path.resolve(
     process.env.RESERVATION_RECORDS_PATH || "reservations.txt",
   );

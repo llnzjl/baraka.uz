@@ -9,6 +9,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { apiFetch, saveApiSessionToken } from "@/lib/client/api";
 type Session = {
   kind: "owner" | "guest";
   number: string | null;
@@ -26,11 +27,7 @@ export default function EntryGate({ children }: { children: ReactNode }) {
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   useEffect(() => {
-    if (process.env.NEXT_PUBLIC_GITHUB_PAGES === "true") {
-      setLoading(false);
-      return;
-    }
-    fetch("/api/session", { cache: "no-store" })
+    apiFetch("/api/session", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setSession(d.session || null))
       .catch(() => setError("Unable to connect. Please try again."))
@@ -45,7 +42,7 @@ export default function EntryGate({ children }: { children: ReactNode }) {
     setBusy(true);
     setError("");
     try {
-      const r = await fetch("/api/session", {
+      const r = await apiFetch("/api/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -64,11 +61,13 @@ export default function EntryGate({ children }: { children: ReactNode }) {
               ? "Too many attempts. Please try again in 10 minutes."
               : "Sign-in is temporarily unavailable. Please try again later or contact the restaurant.",
         );
+      saveApiSessionToken(d.accessToken || null);
       setSession(d);
-      if (kind === "owner") window.location.assign("/admin/reservations");
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+      if (kind === "owner") window.location.assign(`${basePath}/admin/reservations`);
       else
         window.location.assign(
-          "/guest/profile?next=" +
+          `${basePath}/guest/profile?next=` +
             encodeURIComponent(path + window.location.search),
         );
     } catch (e) {
@@ -80,22 +79,14 @@ export default function EntryGate({ children }: { children: ReactNode }) {
   async function logout() {
     setBusy(true);
     try {
-      const r = await fetch("/api/session", { method: "DELETE" });
+      const r = await apiFetch("/api/session", { method: "DELETE" });
       if (!r.ok) throw new Error();
-      window.location.assign("/");
+      saveApiSessionToken(null);
+      window.location.assign(`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/`);
     } catch {
       setError("Could not sign out. Please retry.");
       setBusy(false);
     }
-  }
-  // GitHub Pages is static hosting: there is no server to authenticate users.
-  // Keep the public restaurant site accessible and leave sign-in to a backend deployment.
-  if (process.env.NEXT_PUBLIC_GITHUB_PAGES === "true") {
-    return (
-      <SessionContext.Provider value={{ session: null, setSession }}>
-        {children}
-      </SessionContext.Provider>
-    );
   }
   if (loading)
     return (

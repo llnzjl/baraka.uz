@@ -4,7 +4,7 @@ import { BookingError } from "./validation";
 
 export async function processNotifications() {
   if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM)
-    throw new BookingError("UNAVAILABLE", 503);
+    return { sent: 0, failed: 0, disabled: true };
   let sent = 0,
     failed = 0;
   for (let n = 0; n < 3; n++) {

@@ -2,6 +2,7 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useEntrySession } from "./EntryGate";
+import { apiFetch } from "@/lib/client/api";
 
 export default function GuestProfile() {
   const { session, setSession } = useEntrySession();
@@ -24,7 +25,7 @@ export default function GuestProfile() {
     setBusy(true);
     setError("");
     try {
-      const r = await fetch("/api/session", {
+      const r = await apiFetch("/api/session", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ displayName: keepDefault ? defaultName : name }),

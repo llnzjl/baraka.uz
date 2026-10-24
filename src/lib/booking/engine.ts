@@ -171,9 +171,6 @@ export function publicPolicy() {
 }
 export function productionReady() {
   const present = [
-    "RESEND_API_KEY",
-    "RESEND_FROM",
-    "OWNER_EMAIL",
     "PRIVACY_CONTROLLER",
     "PRIVACY_CONTACT",
     "PRIVACY_POLICY_URL",
@@ -189,8 +186,7 @@ export function productionReady() {
   if (
     !present ||
     (process.env.CRON_SECRET?.length || 0) < 32 ||
-    (process.env.RATE_LIMIT_SECRET?.length || 0) < 32 ||
-    !z.string().email().safeParse(process.env.OWNER_EMAIL).success
+    (process.env.RATE_LIMIT_SECRET?.length || 0) < 32
   )
     return false;
   try {
@@ -253,10 +249,10 @@ export async function enqueue(c: PoolClient, r: Record<string, any>) {
     .replace("T", " ");
   const body = `BARAKA\n${title}\n${r.reference}\n${when} (Asia/Seoul)\n${r.guests} ${{ ko: "명", en: "guests", uz: "kishi", ru: "гостей" }[r.locale as "ko" | "en" | "uz" | "ru"]}\n${process.env.PRIVACY_CONTACT || ""}`;
   const ownerEmail = (await c.query("SELECT owner_email FROM booking.owner_credentials WHERE id=1")).rows[0]?.owner_email || process.env.OWNER_EMAIL;
-  const recipients = [
+  const recipients = process.env.RESEND_API_KEY && process.env.RESEND_FROM ? [
     { email: r.email, kind: "customer" },
     { email: ownerEmail, kind: "owner" },
-  ].filter((x) => x.email);
+  ].filter((x) => x.email) : [];
   for (const x of recipients)
     await c.query(
       "INSERT INTO booking.notifications(reservation_id,event_key,recipient,subject,body) VALUES($1,$2,$3,$4,$5) ON CONFLICT(event_key) DO NOTHING",

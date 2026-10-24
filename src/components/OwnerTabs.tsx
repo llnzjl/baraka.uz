@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/client/api";
 export default function OwnerTabs() {
   const path = usePathname();
   const [waiting, setWaiting] = useState(0);
@@ -9,7 +10,7 @@ export default function OwnerTabs() {
     let alive = true;
     async function refresh() {
       try {
-        const r = await fetch("/api/admin/orders/count", { cache: "no-store" });
+        const r = await apiFetch("/api/admin/orders/count", { cache: "no-store" });
         if (r.ok) {
           const d = await r.json();
           if (alive) setWaiting(d.waiting);
