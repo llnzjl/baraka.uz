@@ -2,8 +2,6 @@ import React from "react";
 import menuData from "./menuData";
 import Image from "next/image";
 import Footer from "@/components/Footer";
-import Link from "next/link";
-import { BsFacebook, BsGithub, BsLinkedin } from "react-icons/bs";
 
 const Feed = () => {
   return (
@@ -94,52 +92,6 @@ const Feed = () => {
             </div>
           </div>
         ))}
-      </div>
-
-      <h1 className="text-[#FACE8D] font-dancing text-[64px] leading-none mb-[32px] mt-[80px]">
-        Teacher
-      </h1>
-      <div className="flex items-center mt-[32px] w-full">
-        <div className="min-w-[80px] min-h-[80px] overflow-hidden relative bg-green-500 rounded-full">
-          <Image
-            src="https://avatars.githubusercontent.com/u/69359203?s=400&u=6634c87609e503bdc6b0ceb5b5b26f02ab99808f&v=4"
-            alt="teacher"
-            width={80}
-            height={80}
-            className="min-w-[80px] w-full min-h-[80px] max-h-[80px] object-cover rounded-full"
-          />
-        </div>
-        <div className="flex flex-col ml-[32px]">
-          <h1 className="text-[24px]">Shariar Sheikh</h1>
-          <p className="text-[16px] mt-[4px] text-white text-opacity-50">
-            Lorem ipsum dolor sit amet consectetur adipisicing elit. Quidem
-            neque quis consequuntur odio sed placeat illo tempore harum, est
-            nesciunt.
-          </p>
-          <div className="flex items-center mt-[20px] space-x-4">
-            <Link
-              className="hover:animate-bounce"
-              target="_blank"
-              href={"https://github.com/ShariarSheikh"}
-            >
-              <BsGithub />
-            </Link>
-            <Link
-              className="hover:animate-bounce"
-              target="_blank"
-              href={"https://www.linkedin.com/in/sheikhshariar/"}
-            >
-              <BsLinkedin />
-            </Link>
-            <Link
-              className="hover:animate-bounce"
-              target="_blank"
-              href={"https://www.facebook.com/profile.php?id=100053248808536"}
-            >
-              <BsFacebook />
-            </Link>
-          </div>
-        </div>
       </div>
 
       <Footer />

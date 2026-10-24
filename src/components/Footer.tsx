@@ -8,16 +8,6 @@ const Footer = () => {
         <Link href="/" className="font-semibold cursor-pointer">
           BARAKA
         </Link>
-        <p className="mt-[32px] text-white text-opacity-50">
-          Created by Shariar Sheikh,{" "}
-          <Link
-            href="https://shariar.vercel.app/"
-            target="_blank"
-            className="text-blue-600 hover:underline"
-          >
-            Website
-          </Link>
-        </p>
       </div>
 
       <div className="w-full max-w-[162px]">
