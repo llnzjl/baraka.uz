@@ -1,6 +1,5 @@
 const pagesMode = process.env.NEXT_PUBLIC_GITHUB_PAGES === "true";
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
-const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
 const tokenKey = "baraka-session-token";
 
 export function saveApiSessionToken(token: string | null) {
@@ -22,8 +21,8 @@ function currentApiToken() {
 
 export function apiUrl(path: string) {
   if (!pagesMode || !path.startsWith("/api/")) return path;
-  if (!supabaseUrl) return path;
-  return `${supabaseUrl}/functions/v1/baraka-api${path.slice(4)}`;
+  if (!apiBaseUrl) return path;
+  return `${apiBaseUrl}${path}`;
 }
 
 async function prepareUpload(init?: RequestInit) {
@@ -70,7 +69,7 @@ async function prepareUpload(init?: RequestInit) {
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
   const path = typeof input === "string" ? input : input.toString();
   if (!pagesMode || !path.startsWith("/api/")) return fetch(input, init);
-  if (!supabaseUrl || !publishableKey)
+  if (!apiBaseUrl)
     return Promise.resolve(
       new Response(JSON.stringify({ error: "UNAVAILABLE" }), {
         status: 503,
@@ -93,8 +92,8 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
       headers: { "Content-Type": "application/json" },
     });
   }
-  headers.set("apikey", publishableKey);
-  headers.set("Authorization", `Bearer ${currentApiToken() || publishableKey}`);
+  const token = currentApiToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
   return fetch(apiUrl(path), { ...prepared, headers, credentials: "omit" });
 }
 

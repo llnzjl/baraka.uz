@@ -21,8 +21,7 @@ jobs:
       GITHUB_PAGES: "true"
       NEXT_PUBLIC_GITHUB_PAGES: "true"
       NEXT_PUBLIC_BASE_PATH: /baraka
-      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
     steps:
       - name: Check out source
@@ -41,13 +40,13 @@ jobs:
       - name: Report backend configuration status
         shell: bash
         run: |
-          if [[ -z "$NEXT_PUBLIC_SUPABASE_URL" || -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" || -z "$NEXT_PUBLIC_TURNSTILE_SITE_KEY" ]]; then
-            echo "::warning::Supabase or Turnstile public settings are missing. The website will publish, but reservations, ordering and login remain unavailable until configured."
+          if [[ -z "$NEXT_PUBLIC_API_BASE_URL" || -z "$NEXT_PUBLIC_TURNSTILE_SITE_KEY" ]]; then
+            echo "::warning::Deno Deploy API URL or Turnstile public site key is missing. The site publishes, but sign-in, reservations and ordering remain unavailable until configured."
           fi
       - name: Prepare the static public site
         shell: bash
         run: |
-          # Pages cannot host Next.js APIs; those run in the Supabase Edge Function.
+          # Pages cannot host Next.js APIs; those run in Deno Deploy.
           rm -rf src/app/api src/app/admin/credentials 'src/app/blog/[blogId]'
       - name: Build static site
         run: npm run build

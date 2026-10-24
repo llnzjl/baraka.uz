@@ -136,51 +136,11 @@ export async function verifyBot(token: string, ip: string) {
   )
     throw new BookingError("BOT_FAILED", 400);
 }
-export async function admin(request: Request, manager = false) {
+export async function admin(request: Request, _manager = false) {
   const local = await readSession(requestToken(request));
-  if (local?.kind === "owner") {
-    await limit("admin", local.id, 180, 60);
-    return { id: local.id, role: "manager" };
-  }
-  const jwt = request.headers.get("authorization")?.match(/^Bearer (.+)$/)?.[1];
-  if (!jwt || jwt.length > 8192) throw new BookingError("UNAUTHORIZED", 401);
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL,
-    key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) throw new BookingError("UNAVAILABLE", 503);
-  const res = await fetch(`${url}/auth/v1/user`, {
-    headers: { apikey: key, Authorization: `Bearer ${jwt}` },
-    cache: "no-store",
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!res.ok) throw new BookingError("UNAUTHORIZED", 401);
-  const user = await res.json();
-  if (!z.string().uuid().safeParse(user.id).success)
-    throw new BookingError("UNAUTHORIZED", 401);
-  // Claims are read only AFTER Supabase has authenticated this exact token.
-  let aal: string;
-  try {
-    aal = JSON.parse(
-      Buffer.from(jwt.split(".")[1], "base64url").toString(),
-    ).aal;
-  } catch {
-    throw new BookingError("UNAUTHORIZED", 401);
-  }
-  if (
-    (process.env.NODE_ENV === "production" ||
-      process.env.ADMIN_REQUIRE_MFA === "true") &&
-    aal !== "aal2"
-  )
-    throw new BookingError("MFA_REQUIRED", 403);
-  const a = (
-    await database().query(
-      "SELECT role FROM booking.admin_users WHERE user_id=$1 AND active",
-      [user.id],
-    )
-  ).rows[0];
-  if (!a || (manager && a.role !== "manager"))
-    throw new BookingError("FORBIDDEN", 403);
-  await limit("admin", user.id, 180, 60);
-  return { id: user.id as string, role: a.role as string };
+  if (local?.kind !== "owner") throw new BookingError("UNAUTHORIZED", 401);
+  await limit("admin", local.id, 180, 60);
+  return { id: local.id, role: "manager" as const };
 }
 export async function owner(request: Request) {
   const local = await readSession(requestToken(request));

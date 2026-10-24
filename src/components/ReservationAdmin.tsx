@@ -44,7 +44,7 @@ const errors: Record<string, string> = {
   STALE_VERSION:
     "Another staff member updated this booking. Refresh and retry.",
   FORBIDDEN:
-    "This account is not authorized. Ask the owner to add your Supabase user ID to booking.admin_users.",
+    "This account is not authorized. Sign in with the restaurant owner account.",
   MFA_REQUIRED: "Complete two-factor authentication.",
   CONFIG_INCOMPLETE:
     "Configure tables, hours, and all required services before enabling bookings.",

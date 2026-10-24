@@ -1,4 +1,0 @@
-project_id = "baraka"
-
-[functions.baraka-api]
-verify_jwt = false

@@ -1,38 +1,38 @@
 import process from "node:process";
 import { Buffer } from "node:buffer";
 import { ImageMagick, initializeImageMagick, MagickFormat } from "@imagemagick/magick-wasm";
-import { admin } from "../../../src/lib/booking/http.ts";
-import { handle, origin, response } from "../../../src/lib/booking/http.ts";
-import { BookingError } from "../../../src/lib/booking/validation.ts";
-import { adminMenu, menuItemSchema, menuImage, publicMenu, saveMenuItem } from "../../../src/lib/menu/engine.ts";
-import * as sessionRoute from "../../../src/app/api/session/route.ts";
-import * as reservationsRoute from "../../../src/app/api/reservations/route.ts";
-import * as availabilityRoute from "../../../src/app/api/reservations/availability/route.ts";
-import * as adminReservationsRoute from "../../../src/app/api/admin/reservations/route.ts";
-import * as adminReservationRoute from "../../../src/app/api/admin/reservations/[id]/route.ts";
-import * as reservationRecordsRoute from "../../../src/app/api/admin/reservations/records/route.ts";
-import * as configRoute from "../../../src/app/api/admin/config/route.ts";
-import * as profileRoute from "../../../src/app/api/admin/profile/route.ts";
-import * as menuRoute from "../../../src/app/api/menu/route.ts";
-import * as ordersRoute from "../../../src/app/api/orders/route.ts";
-import * as orderCatalogRoute from "../../../src/app/api/orders/catalog/route.ts";
-import * as adminOrdersRoute from "../../../src/app/api/admin/orders/route.ts";
-import * as adminOrderRoute from "../../../src/app/api/admin/orders/[id]/route.ts";
-import * as orderCountRoute from "../../../src/app/api/admin/orders/count/route.ts";
-import * as orderRecordsRoute from "../../../src/app/api/admin/orders/records/route.ts";
-import * as receiptsRoute from "../../../src/app/api/admin/orders/receipts/route.ts";
-import * as notificationsRoute from "../../../src/app/api/jobs/notifications/route.ts";
-import * as recordsJobRoute from "../../../src/app/api/jobs/records/route.ts";
-import * as retentionRoute from "../../../src/app/api/jobs/retention/route.ts";
+import { admin } from "../src/lib/booking/http.ts";
+import { handle, origin, response } from "../src/lib/booking/http.ts";
+import { BookingError } from "../src/lib/booking/validation.ts";
+import { adminMenu, menuItemSchema, menuImage, saveMenuItem } from "../src/lib/menu/engine.ts";
+import * as sessionRoute from "../src/app/api/session/route.ts";
+import * as reservationsRoute from "../src/app/api/reservations/route.ts";
+import * as availabilityRoute from "../src/app/api/reservations/availability/route.ts";
+import * as adminReservationsRoute from "../src/app/api/admin/reservations/route.ts";
+import * as adminReservationRoute from "../src/app/api/admin/reservations/[id]/route.ts";
+import * as reservationRecordsRoute from "../src/app/api/admin/reservations/records/route.ts";
+import * as configRoute from "../src/app/api/admin/config/route.ts";
+import * as profileRoute from "../src/app/api/admin/profile/route.ts";
+import * as menuRoute from "../src/app/api/menu/route.ts";
+import * as ordersRoute from "../src/app/api/orders/route.ts";
+import * as orderCatalogRoute from "../src/app/api/orders/catalog/route.ts";
+import * as adminOrdersRoute from "../src/app/api/admin/orders/route.ts";
+import * as adminOrderRoute from "../src/app/api/admin/orders/[id]/route.ts";
+import * as orderCountRoute from "../src/app/api/admin/orders/count/route.ts";
+import * as orderRecordsRoute from "../src/app/api/admin/orders/records/route.ts";
+import * as receiptsRoute from "../src/app/api/admin/orders/receipts/route.ts";
+import * as notificationsRoute from "../src/app/api/jobs/notifications/route.ts";
+import * as recordsJobRoute from "../src/app/api/jobs/records/route.ts";
+import * as retentionRoute from "../src/app/api/jobs/retention/route.ts";
 
 Object.assign(process.env, Deno.env.toObject(), {
   BARAKA_EDGE: "true",
   NODE_ENV: "production",
 });
-process.env.DATABASE_URL ||= Deno.env.get("SUPABASE_DB_URL") || "";
+process.env.DATABASE_URL ||= Deno.env.get("DATABASE_URL") || "";
 
 const allowedOrigin = () => process.env.APP_ORIGIN || "";
-const allowedHeaders = "authorization, apikey, content-type, x-client-info";
+const allowedHeaders = "authorization, content-type";
 
 function cors(responseToWrap: Response, originHeader: string | null) {
   const headers = new Headers(responseToWrap.headers);
@@ -49,20 +49,11 @@ function cors(responseToWrap: Response, originHeader: string | null) {
   });
 }
 
-function publicKey() {
-  if (process.env.SUPABASE_ANON_KEY) return process.env.SUPABASE_ANON_KEY;
-  if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  try {
-    return JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") || "{}").default || "";
-  } catch {
-    return "";
-  }
-}
-
 function apiPath(url: URL) {
-  const marker = "/functions/v1/baraka-api";
-  const index = url.pathname.indexOf(marker);
-  return index < 0 ? url.pathname : url.pathname.slice(index + marker.length) || "/";
+  if (url.pathname === "/api") return "/";
+  return url.pathname.startsWith("/api/")
+    ? url.pathname.slice("/api".length)
+    : url.pathname;
 }
 
 function routeModule(path: string, method: string) {
@@ -188,10 +179,6 @@ Deno.serve(async (request) => {
     if (requestOrigin && requestOrigin !== allowedOrigin()) return cors(response({ error: "FORBIDDEN" }, 403), requestOrigin);
     const path = apiPath(new URL(request.url));
     const publicImage = request.method === "GET" && /^\/menu\/images\/[a-z0-9-]+$/.test(path);
-    const key = publicKey();
-    if (!publicImage && (!key || request.headers.get("apikey") !== key)) {
-      return cors(response({ error: "UNAUTHORIZED" }, 401), requestOrigin);
-    }
     if (publicImage) return cors(await menuImageResponse(path), requestOrigin);
     if (path === "/admin/menu" || path.startsWith("/admin/menu/")) return cors(await menuAdmin(request, path), requestOrigin);
     const module = routeModule(path, request.method.toUpperCase());

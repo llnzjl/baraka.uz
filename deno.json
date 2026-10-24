@@ -1,0 +1,22 @@
+{
+  "unstable": ["sloppy-imports"],
+  "nodeModulesDir": "auto",
+  "compilerOptions": {
+    "types": ["npm:@types/pg@8.23.1"]
+  },
+  "imports": {
+    "@/": "./src/",
+    "pg": "npm:pg@8.23.1",
+    "zod": "npm:zod@3.25.76",
+    "crypto": "node:crypto",
+    "@imagemagick/magick-wasm": "npm:@imagemagick/magick-wasm@0.0.30"
+  },
+  "deploy": {
+    "install": "npm ci",
+    "predeploy": "node scripts/migrate.mjs",
+    "runtime": {
+      "type": "dynamic",
+      "entrypoint": "./backend/index.ts"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+name: Check Deno API backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "src/app/api/**"
+      - "src/lib/booking/**"
+      - "src/lib/menu/**"
+      - "db/migrations/**"
+      - "scripts/migrate.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - "deno.json"
+      - "deno.lock"
+      - ".github/workflows/backend-check.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "src/app/api/**"
+      - "src/lib/booking/**"
+      - "src/lib/menu/**"
+      - "db/migrations/**"
+      - "scripts/migrate.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - "deno.json"
+      - "deno.lock"
+      - ".github/workflows/backend-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check API backend
+        run: deno check backend/index.ts
