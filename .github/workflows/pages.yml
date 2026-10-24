@@ -38,12 +38,12 @@ jobs:
         run: npm test
       - name: Run PostgreSQL concurrency and workflow tests
         run: npm run test:db
-      - name: Verify public Supabase configuration
+      - name: Report backend configuration status
         shell: bash
         run: |
-          test -n "$NEXT_PUBLIC_SUPABASE_URL" || { echo "Set repository variable NEXT_PUBLIC_SUPABASE_URL before publishing."; exit 1; }
-          test -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" || { echo "Set repository variable NEXT_PUBLIC_SUPABASE_ANON_KEY before publishing."; exit 1; }
-          test -n "$NEXT_PUBLIC_TURNSTILE_SITE_KEY" || { echo "Set repository variable NEXT_PUBLIC_TURNSTILE_SITE_KEY before publishing."; exit 1; }
+          if [[ -z "$NEXT_PUBLIC_SUPABASE_URL" || -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" || -z "$NEXT_PUBLIC_TURNSTILE_SITE_KEY" ]]; then
+            echo "::warning::Supabase or Turnstile public settings are missing. The website will publish, but reservations, ordering and login remain unavailable until configured."
+          fi
       - name: Prepare the static public site
         shell: bash
         run: |
