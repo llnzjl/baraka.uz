@@ -26,6 +26,10 @@ export default function EntryGate({ children }: { children: ReactNode }) {
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_GITHUB_PAGES === "true") {
+      setLoading(false);
+      return;
+    }
     fetch("/api/session", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setSession(d.session || null))
@@ -83,6 +87,15 @@ export default function EntryGate({ children }: { children: ReactNode }) {
       setError("Could not sign out. Please retry.");
       setBusy(false);
     }
+  }
+  // GitHub Pages is static hosting: there is no server to authenticate users.
+  // Keep the public restaurant site accessible and leave sign-in to a backend deployment.
+  if (process.env.NEXT_PUBLIC_GITHUB_PAGES === "true") {
+    return (
+      <SessionContext.Provider value={{ session: null, setSession }}>
+        {children}
+      </SessionContext.Provider>
+    );
   }
   if (loading)
     return (

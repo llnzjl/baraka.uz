@@ -12,6 +12,10 @@ import { menuItems, type MenuItem, type Category } from "@/data/menu";
 
 type Language = "en" | "ko";
 type Props = { menuPhotos?: Record<string, string> };
+const publicAsset = (source: string) => {
+  const prefix = process.env.NEXT_PUBLIC_BASE_PATH || "";
+  return prefix && source.startsWith("/") ? `${prefix}${source}` : source;
+};
 const categories: { id: Category; en: string; ko: string }[] = [
   { id: "all", en: "All dishes", ko: "전체 메뉴" },
   { id: "mains", en: "Mains & noodles", ko: "메인 · 면" },
@@ -30,7 +34,7 @@ function DishPhoto({ item, path, language }: { item: MenuItem; path?: string; la
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [path]);
   return <div className={`dish-photo dish-photo--${item.category}`}>
-    {path && !failed ? <Image src={path} alt={language === "ko" ? item.ko : item.name} fill sizes="(max-width: 640px) 90vw, (max-width: 1000px) 45vw, 30vw" onError={() => setFailed(true)} /> : <>
+    {path && !failed ? <Image src={publicAsset(path)} alt={language === "ko" ? item.ko : item.name} fill sizes="(max-width: 640px) 90vw, (max-width: 1000px) 45vw, 30vw" onError={() => setFailed(true)} /> : <>
       <div className="plate-art" aria-hidden="true"><span /><Utensils size={34} /></div>
       <span className="photo-soon"><Camera size={13} />{language === "ko" ? "사진 준비 중" : "A photo is on its way"}</span>
     </>}
@@ -64,6 +68,11 @@ export default function RestaurantSite({ menuPhotos = {} }: Props) {
   }, []);
   useEffect(() => {
     let alive = true;
+    if (process.env.NEXT_PUBLIC_GITHUB_PAGES === "true") {
+      return () => {
+        alive = false;
+      };
+    }
     const refresh = async () => {
       try {
         const response = await fetch("/api/menu", { cache: "no-store" });
@@ -173,7 +182,7 @@ export default function RestaurantSite({ menuPhotos = {} }: Props) {
         </div>
         <div className="hero-visual">
           <Ornament className="hero-ornament" />
-          <div className="hero-image">{!heroFailed ? <Image src="/images/plov-editorial.jpg" alt={t("Editorial photograph of Central Asian plov with lamb, rice and carrots", "양고기와 당근을 넣은 중앙아시아 플로프 참고 사진")} fill priority sizes="(max-width: 760px) 92vw, 47vw" onError={() => setHeroFailed(true)} /> : <div className="image-fallback"><Ornament /><span>BARAKA</span></div>}<div className="hero-image-shade" /><a className="hero-caption" href="#gallery"><span>{t("THE TASTE OF THE SILK ROAD · EDITORIAL IMAGE", "실크로드의 맛 · 음식 참고 사진")}<strong>{t("Osh. A tradition worth sharing.", "함께 나누는 전통, 플로프.")}</strong></span><ArrowUpRight size={25} /></a></div>
+          <div className="hero-image">{!heroFailed ? <Image src={publicAsset("/images/plov-editorial.jpg")} alt={t("Editorial photograph of Central Asian plov with lamb, rice and carrots", "양고기와 당근을 넣은 중앙아시아 플로프 참고 사진")} fill priority sizes="(max-width: 760px) 92vw, 47vw" onError={() => setHeroFailed(true)} /> : <div className="image-fallback"><Ornament /><span>BARAKA</span></div>}<div className="hero-image-shade" /><a className="hero-caption" href="#gallery"><span>{t("THE TASTE OF THE SILK ROAD · EDITORIAL IMAGE", "실크로드의 맛 · 음식 참고 사진")}<strong>{t("Osh. A tradition worth sharing.", "함께 나누는 전통, 플로프.")}</strong></span><ArrowUpRight size={25} /></a></div>
           <div className="hero-seal"><span>UZBEK ROOTS</span><Ornament /><span>WARM HEARTS</span></div>
           <div className="hero-side-note">GOOD FOOD. GOOD COMPANY.</div>
         </div>
@@ -203,7 +212,7 @@ export default function RestaurantSite({ menuPhotos = {} }: Props) {
 
       <section className="story-section" id="story" aria-labelledby="story-title"><div className="story-inner section-shell"><div className="story-art" aria-hidden="true"><div className="story-arch"><Ornament /><span>BARAKA</span><small>O‘ZBEK TAOMLARI</small></div><span className="story-art-caption">A LITTLE TASTE OF HOME</span></div><div className="story-copy"><p className="eyebrow">02 / {t("A PLACE TO COME TOGETHER", "함께하는 공간")}</p><h2 id="story-title">{t("From Uzbekistan,", "우즈베키스탄에서,")}<br /><em>{t("with warmth.", "당신의 식탁까지.")}</em></h2><p>{t("Some of the best moments happen around a table. Bread is passed, stories are shared, and there is always room for one more.", "좋은 순간은 식탁에서 시작됩니다. 빵을 나누고, 이야기를 나누고, 서로를 위한 자리를 내어주는 곳.")}</p><p>{t("That is the feeling we want you to find at BARAKA. Uzbek flavours, a generous spirit, and a little corner of Cheongju to make yourself at home.", "BARAKA에서 그런 편안함을 느끼셨으면 합니다. 우즈베키스탄의 맛과 넉넉한 마음이 있는 청주의 작은 공간입니다.")}</p><a href="#reserve" className="text-link">{t("Let’s make a plan", "만날 날을 정해볼까요")}<ArrowUpRight size={20} /></a></div></div></section>
 
-      <section className="chef-section section-shell" id="chef" aria-labelledby="chef-title"><div className="chef-photo-wrap"><div className="chef-photo">{!chefFailed ? <Image src="/images/chef.jpg" alt={t("Chef Asr working in his kitchen", "주방에서 요리하는 셰프 Asr")} fill sizes="(max-width: 760px) 90vw, 45vw" onError={() => setChefFailed(true)} /> : <div className="image-fallback"><Utensils size={64} /><span>Chef Asr</span></div>}</div><a href="https://www.instagram.com/p/DbXglYOTsDc/" target="_blank" rel="noopener noreferrer" className="chef-photo-credit"><Instagram size={15} />{t("A moment in the kitchen", "주방에서의 한 순간")}<ArrowUpRight size={16} /></a><div className="chef-photo-tag">THE HANDS.<br />THE HEART.<br /><em>THE CHEF.</em></div></div><div className="chef-copy"><p className="eyebrow">03 / {t("MEET THE PERSON BEHIND THE PLATE", "요리 뒤에 있는 사람")}</p><h2 id="chef-title">{t("Good food has", "좋은 음식에는")}<br /><em>{t("a human touch.", "사람의 온기가.")}</em></h2><div className="chef-name"><h3>{restaurant.chefName}</h3><span>CHEF DE CUISINE</span></div><p>{t("Meet Chef Asr. His kitchen brings together Uzbek and European cooking, with a love for the craft that shows up in every step.", "셰프 Asr를 소개합니다. 우즈베키스탄과 유럽 요리를 선보이며, 요리의 매 순간에 정성을 담습니다.")}</p><p>{t("Get to know the person behind your next meal: the preparation, the fire, and the everyday life of a chef in Korea.", "요리 준비부터 불 앞에서의 순간까지. 한국에서 요리하는 셰프의 일상을 만나보세요.")}</p><a className="button button-outline" href={restaurant.instagram} target="_blank" rel="noopener noreferrer"><Instagram size={18} />@asr.chef<ArrowUpRight size={18} /></a><div className="chef-signature">Asr<span>{t("From my kitchen, with heart.", "제 주방에서, 마음을 담아.")}</span></div></div></section>
+      <section className="chef-section section-shell" id="chef" aria-labelledby="chef-title"><div className="chef-photo-wrap"><div className="chef-photo">{!chefFailed ? <Image src={publicAsset("/images/chef.jpg")} alt={t("Chef Asr working in his kitchen", "주방에서 요리하는 셰프 Asr")} fill sizes="(max-width: 760px) 90vw, 45vw" onError={() => setChefFailed(true)} /> : <div className="image-fallback"><Utensils size={64} /><span>Chef Asr</span></div>}</div><a href="https://www.instagram.com/p/DbXglYOTsDc/" target="_blank" rel="noopener noreferrer" className="chef-photo-credit"><Instagram size={15} />{t("A moment in the kitchen", "주방에서의 한 순간")}<ArrowUpRight size={16} /></a><div className="chef-photo-tag">THE HANDS.<br />THE HEART.<br /><em>THE CHEF.</em></div></div><div className="chef-copy"><p className="eyebrow">03 / {t("MEET THE PERSON BEHIND THE PLATE", "요리 뒤에 있는 사람")}</p><h2 id="chef-title">{t("Good food has", "좋은 음식에는")}<br /><em>{t("a human touch.", "사람의 온기가.")}</em></h2><div className="chef-name"><h3>{restaurant.chefName}</h3><span>CHEF DE CUISINE</span></div><p>{t("Meet Chef Asr. His kitchen brings together Uzbek and European cooking, with a love for the craft that shows up in every step.", "셰프 Asr를 소개합니다. 우즈베키스탄과 유럽 요리를 선보이며, 요리의 매 순간에 정성을 담습니다.")}</p><p>{t("Get to know the person behind your next meal: the preparation, the fire, and the everyday life of a chef in Korea.", "요리 준비부터 불 앞에서의 순간까지. 한국에서 요리하는 셰프의 일상을 만나보세요.")}</p><a className="button button-outline" href={restaurant.instagram} target="_blank" rel="noopener noreferrer"><Instagram size={18} />@asr.chef<ArrowUpRight size={18} /></a><div className="chef-signature">Asr<span>{t("From my kitchen, with heart.", "제 주방에서, 마음을 담아.")}</span></div></div></section>
 
       <SilkRoadSections language={language} />
 

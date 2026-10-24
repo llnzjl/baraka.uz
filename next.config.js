@@ -1,16 +1,28 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // GitHub Pages can serve only static files. The Pages workflow builds the
+  // public restaurant site with its project-repository URL prefix.
+  ...(process.env.GITHUB_PAGES === "true"
+    ? {
+        output: "export",
+        basePath: "/baraka",
+      }
+    : {}),
   distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
   images: {
+    unoptimized: process.env.GITHUB_PAGES === "true",
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "plus.unsplash.com" },
       { protocol: "https", hostname: "avatars.githubusercontent.com" },
     ],
   },
-  async headers() {
-    return [
+  ...(process.env.GITHUB_PAGES === "true"
+    ? {}
+    : {
+        async headers() {
+          return [
       {
         source: "/:path*",
         headers: [
@@ -26,7 +38,8 @@ const nextConfig = {
             : []),
         ],
       },
-    ];
-  },
+          ];
+        },
+      }),
 };
 module.exports = nextConfig;
