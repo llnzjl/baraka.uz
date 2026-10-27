@@ -4,7 +4,7 @@ import "./globals.css";
 import "./silk-road.css";
 import "./booking.css";
 import "./orders.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { restaurant } from "@/data/restaurant";
 
 export const metadata: Metadata = {
@@ -19,7 +19,11 @@ export const metadata: Metadata = {
 
 };
 
-export const viewport = { themeColor: "#102C3C" };
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#102C3C",
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const structuredData = {
