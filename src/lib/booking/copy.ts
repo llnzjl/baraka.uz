@@ -2,7 +2,7 @@ import { Locale } from "./validation";
 const en = {
   title: "A place at our table.",
   intro:
-    "Open 24 hours, every day. Choose your date and party size for live availability in Korea Standard Time (Asia/Seoul). For today, only times that have not passed are shown.",
+    "Choose Noon (11:00 AM–2:00 PM) or Evening (5:00 PM–12:00 AM). Select an available 30-minute start time in Korea Standard Time.",
   date: "Date",
   guests: "Guests",
   time: "Available times",

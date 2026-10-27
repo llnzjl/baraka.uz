@@ -210,6 +210,7 @@ export async function availability(date: string, guests: number) {
       slots: ready ? slotsFor(state, date, guests).map((s) => s.time) : [],
       enabled: ready,
       timezone: "Asia/Seoul",
+      diningMinutes: state.config.dining_minutes,
       retentionDays: state.config.retention_days,
       privacyVersion: state.config.privacy_version,
       maxParty: state.config.max_party,

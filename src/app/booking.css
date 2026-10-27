@@ -45,6 +45,7 @@
 .booking-clock { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 12px 0; color: #102c3c; font-size: 13px; }
 .booking-clock input { min-height: 48px; padding: 10px 14px; border: 1px solid #102c3c55; border-radius: 2px; background: #fffdf8; color: #102c3c; font: inherit; font-size: 18px; }
 .booking-clock input:focus-visible { outline: 2px solid #102c3c; outline-offset: 3px; }
+.booking-slots .booking-service-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0 16px}.booking-service-button,.booking-time-button{min-height:50px;padding:11px 14px;border:1px solid #c7a66b;background:#fffdf8;color:#102c3c;font:inherit;font-size:13px;line-height:1.4;cursor:pointer;transition:background .15s,color .15s,border-color .15s}.booking-service-button[aria-pressed=true],.booking-time-button[aria-pressed=true]{background:#183c30;color:#fffdf8;border-color:#183c30}.booking-service-button:hover,.booking-time-button:hover{border-color:#183c30}.booking-service-button:focus-visible,.booking-time-button:focus-visible{outline:3px solid #b57c2e;outline-offset:3px}.booking-slots .booking-time-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:8px;margin:10px 0 14px}.booking-time-button{min-height:46px;padding:9px 12px;font-variant-numeric:tabular-nums}
 .booking-slots label {
   position: relative;
   cursor: pointer;

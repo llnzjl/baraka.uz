@@ -10,6 +10,7 @@ import { apiFetch } from "@/lib/client/api";
 type Availability = {
   slots: string[];
   enabled: boolean;
+  diningMinutes: number;
   retentionDays: number;
   privacyVersion: string;
   maxParty: number;
@@ -23,6 +24,26 @@ type Receipt = {
   time: string;
   guests: number;
 };
+type ServicePeriod = "noon" | "evening";
+const serviceWindow: Record<ServicePeriod, { start: number; end: number }> = {
+  noon: { start: 11 * 60, end: 14 * 60 },
+  evening: { start: 17 * 60, end: 24 * 60 },
+};
+function timeMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+function formatSlotTime(value: string, locale: Locale) {
+  const [hours, minutes] = value.split(":").map(Number);
+  const date = new Date(Date.UTC(2020, 0, 1, hours, minutes));
+  const language = { ko: "ko-KR", en: "en-US", uz: "uz-UZ", ru: "ru-RU" }[locale];
+  return new Intl.DateTimeFormat(language, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "UTC",
+  }).format(date);
+}
 type Turnstile = {
   render: (element: HTMLElement, options: Record<string, unknown>) => string;
   remove: (id: string) => void;
@@ -93,7 +114,8 @@ export default function BookingForm({
   const [locale, setLocale] = useState<Locale>(initialLocale),
     [date, setDate] = useState(""),
     [guests, setGuests] = useState(2),
-    [time, setTime] = useState("");
+    [time, setTime] = useState(""),
+    [service, setService] = useState<ServicePeriod | null>(null);
   const [data, setData] = useState<Availability | null>(null),
     [loading, setLoading] = useState(false),
     [busy, setBusy] = useState(false),
@@ -108,6 +130,36 @@ export default function BookingForm({
   const [today, setToday] = useState("");
   const t = bookingCopy[locale],
     token = useCallback((v: string) => setBotToken(v), []);
+  const serviceCopy = {
+    en: {
+      noon: "Noon · 11:00 AM–2:00 PM",
+      evening: "Evening · 5:00 PM–12:00 AM",
+      choose: "Choose Noon or Evening, then select an available time.",
+      none: "No available times in this service. Choose the other service or another date.",
+      intro: "Choose Noon (11:00 AM–2:00 PM) or Evening (5:00 PM–12:00 AM). Available starts are shown every 30 minutes in Korea Standard Time.",
+    },
+    ko: {
+      noon: "점심 · 오전 11:00–오후 2:00",
+      evening: "저녁 · 오후 5:00–자정",
+      choose: "점심 또는 저녁을 고른 다음 예약 시간을 선택해 주세요.",
+      none: "이 시간대에 예약 가능한 시간이 없습니다. 다른 시간대나 날짜를 선택해 주세요.",
+      intro: "점심(오전 11시~오후 2시) 또는 저녁(오후 5시~자정)을 선택해 주세요. 예약 가능한 시간은 30분 간격으로 표시됩니다.",
+    },
+    uz: {
+      noon: "Tushlik · 11:00–14:00",
+      evening: "Kechki ovqat · 17:00–00:00",
+      choose: "Tushlik yoki kechki ovqatni, so‘ng bo‘sh vaqtni tanlang.",
+      none: "Bu vaqt oralig‘ida bo‘sh joy yo‘q. Boshqa vaqt yoki sanani tanlang.",
+      intro: "Tushlik (11:00–14:00) yoki kechki ovqatni (17:00–00:00) tanlang. Bo‘sh vaqtlar 30 daqiqalik oraliqda ko‘rsatiladi.",
+    },
+    ru: {
+      noon: "Обед · 11:00–14:00",
+      evening: "Вечер · 17:00–00:00",
+      choose: "Выберите обед или вечер, затем доступное время.",
+      none: "В это время нет свободных мест. Выберите другой период или дату.",
+      intro: "Выберите обед (11:00–14:00) или вечер (17:00–00:00). Доступное время показывается с интервалом 30 минут.",
+    },
+  }[locale];
   const help = {
     en: {
       choose: "Choose an available time before reserving.",
@@ -127,7 +179,17 @@ export default function BookingForm({
     },
   }[locale];
   const unavailable = t.unavailable;
-  const timeAvailable = Boolean(data?.slots.includes(time));
+  const serviceSlots = service && data
+    ? data.slots.filter((slot) => {
+        const minute = timeMinutes(slot);
+        const window = serviceWindow[service];
+        return minute >= window.start &&
+          minute < window.end &&
+          minute + data.diningMinutes <= window.end &&
+          minute % 30 === 0;
+      })
+    : [];
+  const timeAvailable = Boolean(time && serviceSlots.includes(time));
   const blocked = loading || !data?.enabled || !timeAvailable;
   const blockedMessage = loading
     ? t.loading
@@ -135,9 +197,13 @@ export default function BookingForm({
       ? unavailable
       : !data.slots.length
         ? t.empty
-        : time && !timeAvailable
-          ? t.conflict
-          : help.choose;
+          : !service
+            ? serviceCopy.choose
+            : !serviceSlots.length
+              ? serviceCopy.none
+              : time && !timeAvailable
+                ? t.conflict
+                : help.choose;
   useEffect(() => setLocale(initialLocale), [initialLocale]);
   useEffect(() => {
     setDate(seoulDate());
@@ -275,7 +341,7 @@ export default function BookingForm({
         <div className={styles.introduction}>
           <p className={styles.eyebrow}>BARAKA · RESERVATIONS</p>
           <h2>{t.title}</h2>
-          <p className={styles.description}>{t.intro}</p>
+          <p className={styles.description}>{serviceCopy.intro}</p>
           <a className={styles.phone} href="tel:+82432688329">
             <strong>043-268-8329</strong>
             <span aria-hidden="true">↗</span>
@@ -293,7 +359,7 @@ export default function BookingForm({
             </h3>
             <strong>{receipt.reference}</strong>
             <p>
-              {receipt.date} · {receipt.time} KST · {receipt.guests} {t.guests}
+              {receipt.date} · {formatSlotTime(receipt.time, locale)} KST · {receipt.guests} {t.guests}
             </p>
             <p>{t.saved}</p>
             <button
@@ -329,6 +395,8 @@ export default function BookingForm({
                     }
                     onChange={(e) => {
                       setData(null);
+                      setService(null);
+                      setTime("");
                       setDate(e.target.value);
                     }}
                     required
@@ -344,6 +412,8 @@ export default function BookingForm({
                     value={guests}
                     onChange={(e) => {
                       setData(null);
+                      setService(null);
+                      setTime("");
                       setGuests(Number(e.target.value));
                     }}
                     required
@@ -353,20 +423,41 @@ export default function BookingForm({
               <fieldset className="booking-slots">
                 <legend>{t.time}</legend>
                 {data?.enabled && (
-                  <label className="booking-clock">
-                    <span>{locale === "ko" ? "예약 시간 (10:00 AM–12:00 AM)" : locale === "uz" ? "Vaqtni tanlang (10:00–00:00)" : locale === "ru" ? "Время (10:00–00:00)" : "Choose a time (10:00 AM–12:00 AM)"}</span>
-                    <input
-                      aria-label={t.time}
-                      type="time"
-                      name="time"
-                      min="10:00"
-                      max="23:59"
-                      step="60"
-                      value={time}
-                      onChange={(e) => setTime(e.target.value)}
-                      required
-                    />
-                  </label>
+                  <>
+                    <div className="booking-service-buttons" role="group" aria-label={t.time}>
+                      <button
+                        type="button"
+                        className="booking-service-button"
+                        aria-pressed={service === "noon"}
+                        onClick={() => { setService("noon"); setTime(""); setError(""); }}
+                      >
+                        {serviceCopy.noon}
+                      </button>
+                      <button
+                        type="button"
+                        className="booking-service-button"
+                        aria-pressed={service === "evening"}
+                        onClick={() => { setService("evening"); setTime(""); setError(""); }}
+                      >
+                        {serviceCopy.evening}
+                      </button>
+                    </div>
+                    {service && (
+                      <div className="booking-time-options" role="group" aria-label={serviceCopy[service]}>
+                        {serviceSlots.map((slot) => (
+                          <button
+                            key={slot}
+                            type="button"
+                            className="booking-time-button"
+                            aria-pressed={time === slot}
+                            onClick={() => { setTime(slot); setError(""); }}
+                          >
+                            {formatSlotTime(slot, locale)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
                 <p role="status">
                   {loading
@@ -375,9 +466,13 @@ export default function BookingForm({
                       ? unavailable
                       : !data.slots.length
                         ? t.empty
-                        : time && !timeAvailable
-                          ? t.conflict
-                          : ""}
+                          : !service
+                            ? serviceCopy.choose
+                            : !serviceSlots.length
+                              ? serviceCopy.none
+                              : time && !timeAvailable
+                                ? t.conflict
+                                : ""}
                 </p>
               </fieldset>
               <div className={styles.field}>
