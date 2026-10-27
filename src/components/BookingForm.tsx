@@ -29,10 +29,6 @@ const serviceWindow: Record<ServicePeriod, { start: number; end: number }> = {
   noon: { start: 11 * 60, end: 14 * 60 },
   evening: { start: 17 * 60, end: 24 * 60 },
 };
-function timeMinutes(value: string) {
-  const [hours, minutes] = value.split(":").map(Number);
-  return hours * 60 + minutes;
-}
 function formatSlotTime(value: string, locale: Locale) {
   const [hours, minutes] = value.split(":").map(Number);
   const date = new Date(Date.UTC(2020, 0, 1, hours, minutes));
@@ -136,6 +132,8 @@ export default function BookingForm({
       evening: "Evening · 5:00 PM–12:00 AM",
       choose: "Choose Noon or Evening, then select an available time.",
       none: "No available times in this service. Choose the other service or another date.",
+      available: "Available",
+      unavailable: "Unavailable",
       intro: "Choose Noon (11:00 AM–2:00 PM) or Evening (5:00 PM–12:00 AM). Available starts are shown every 30 minutes in Korea Standard Time.",
     },
     ko: {
@@ -143,6 +141,8 @@ export default function BookingForm({
       evening: "저녁 · 오후 5:00–자정",
       choose: "점심 또는 저녁을 고른 다음 예약 시간을 선택해 주세요.",
       none: "이 시간대에 예약 가능한 시간이 없습니다. 다른 시간대나 날짜를 선택해 주세요.",
+      available: "예약 가능",
+      unavailable: "예약 불가",
       intro: "점심(오전 11시~오후 2시) 또는 저녁(오후 5시~자정)을 선택해 주세요. 예약 가능한 시간은 30분 간격으로 표시됩니다.",
     },
     uz: {
@@ -150,6 +150,8 @@ export default function BookingForm({
       evening: "Kechki ovqat · 17:00–00:00",
       choose: "Tushlik yoki kechki ovqatni, so‘ng bo‘sh vaqtni tanlang.",
       none: "Bu vaqt oralig‘ida bo‘sh joy yo‘q. Boshqa vaqt yoki sanani tanlang.",
+      available: "Bo‘sh",
+      unavailable: "Bo‘sh emas",
       intro: "Tushlik (11:00–14:00) yoki kechki ovqatni (17:00–00:00) tanlang. Bo‘sh vaqtlar 30 daqiqalik oraliqda ko‘rsatiladi.",
     },
     ru: {
@@ -157,6 +159,8 @@ export default function BookingForm({
       evening: "Вечер · 17:00–00:00",
       choose: "Выберите обед или вечер, затем доступное время.",
       none: "В это время нет свободных мест. Выберите другой период или дату.",
+      available: "Доступно",
+      unavailable: "Недоступно",
       intro: "Выберите обед (11:00–14:00) или вечер (17:00–00:00). Доступное время показывается с интервалом 30 минут.",
     },
   }[locale];
@@ -179,16 +183,15 @@ export default function BookingForm({
     },
   }[locale];
   const unavailable = t.unavailable;
-  const serviceSlots = service && data
-    ? data.slots.filter((slot) => {
-        const minute = timeMinutes(slot);
-        const window = serviceWindow[service];
-        return minute >= window.start &&
-          minute < window.end &&
-          minute + data.diningMinutes <= window.end &&
-          minute % 30 === 0;
-      })
+  const serviceTimes = service && data
+    ? Array.from(
+        { length: Math.ceil((serviceWindow[service].end - serviceWindow[service].start) / 30) },
+        (_, index) => serviceWindow[service].start + index * 30,
+      )
+        .filter((minute) => minute + data.diningMinutes <= serviceWindow[service].end)
+        .map((minute) => `${String(Math.floor(minute / 60) % 24).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`)
     : [];
+  const serviceSlots = serviceTimes.filter((slot) => data?.slots.includes(slot));
   const timeAvailable = Boolean(time && serviceSlots.includes(time));
   const blocked = loading || !data?.enabled || !timeAvailable;
   const blockedMessage = loading
@@ -444,17 +447,23 @@ export default function BookingForm({
                     </div>
                     {service && (
                       <div className="booking-time-options" role="group" aria-label={serviceCopy[service]}>
-                        {serviceSlots.map((slot) => (
-                          <button
-                            key={slot}
-                            type="button"
-                            className="booking-time-button"
-                            aria-pressed={time === slot}
-                            onClick={() => { setTime(slot); setError(""); }}
-                          >
-                            {formatSlotTime(slot, locale)}
-                          </button>
-                        ))}
+                        {serviceTimes.map((slot) => {
+                          const available = serviceSlots.includes(slot);
+                          const label = formatSlotTime(slot, locale);
+                          return (
+                            <button
+                              key={slot}
+                              type="button"
+                              className="booking-time-button"
+                              disabled={!available}
+                              aria-label={`${label} · ${available ? serviceCopy.available : serviceCopy.unavailable}`}
+                              aria-pressed={time === slot}
+                              onClick={() => { setTime(slot); setError(""); }}
+                            >
+                              {label}{!available && <small className="booking-time-unavailable">{serviceCopy.unavailable}</small>}
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </>
