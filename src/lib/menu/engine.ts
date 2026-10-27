@@ -17,7 +17,7 @@ export const menuItemSchema = z.object({
 export type MenuRecord = Omit<z.infer<typeof menuItemSchema>, "id"> & { id: string; image: string; updatedAt: string };
 let seeded = false;
 
-export async function ensureMenuSeeded(c: import("pg").PoolClient) {
+export async function ensureMenuSeeded(c: import("../booking/db").DatabaseClient) {
   if (seeded) return;
   await c.query("SELECT pg_advisory_xact_lock(739174202)");
   const existing = Number((await c.query("SELECT count(*)::int AS count FROM booking.restaurant_menu")).rows[0].count);

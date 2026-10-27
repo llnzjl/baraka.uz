@@ -33,6 +33,25 @@ export default function EntryGate({ children }: { children: ReactNode }) {
       .catch(() => setError("Unable to connect. Please try again."))
       .finally(() => setLoading(false));
   }, []);
+  useEffect(() => {
+    if (session?.kind !== "guest") return;
+    let active = true;
+    const refresh = async () => {
+      try {
+        const response = await apiFetch("/api/session", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (active) setSession(data.session || null);
+      } catch { /* Keep the current view during temporary network failures. */ }
+    };
+    const timer = window.setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [session?.kind]);
   async function login(
     kind: "owner" | "guest",
     e?: FormEvent<HTMLFormElement>,
@@ -59,7 +78,9 @@ export default function EntryGate({ children }: { children: ReactNode }) {
             ? "Incorrect username or password."
             : d.error === "RATE_LIMITED"
               ? "Too many attempts. Please try again in 10 minutes."
-              : "Sign-in is temporarily unavailable. Please try again later or contact the restaurant.",
+              : d.error === "FORBIDDEN"
+                ? "Sign-in was blocked for this website address. Open the restaurant's configured website address and try again."
+                : "Sign-in is temporarily unavailable. Please try again later or contact the restaurant.",
         );
       saveApiSessionToken(d.accessToken || null);
       setSession(d);

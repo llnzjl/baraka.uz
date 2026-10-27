@@ -145,6 +145,9 @@ export default function OrderAdmin() {
         <button className="text-link" onClick={() => void downloadApiFile("/api/admin/orders/receipts", "receipts.txt").catch(() => setError("Download unavailable"))}>
           Download meal receipts (.txt)
         </button>
+        <button className="text-link" onClick={() => void downloadApiFile("/api/admin/history", "history.txt").catch(() => setError("Download unavailable"))}>
+          Download guest history (.txt)
+        </button>
         <small>
           {updated
             ? `Updated ${updated} KST · refreshes every 3 seconds`

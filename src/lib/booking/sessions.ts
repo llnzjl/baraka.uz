@@ -31,7 +31,7 @@ async function ownerCredentials(): Promise<OwnerCredentials> {
   if (!row) throw new BookingError("UNAVAILABLE", 503);
   return row;
 }
-export async function currentOwnerEmail(connection?: Pick<import("pg").PoolClient, "query">) {
+export async function currentOwnerEmail(connection?: Pick<import("./db").DatabaseClient, "query">) {
   const query = connection || database();
   const stored = (await query.query("SELECT owner_email FROM booking.owner_credentials WHERE id=1")).rows[0]?.owner_email as string | null | undefined;
   return stored?.trim() || process.env.OWNER_EMAIL?.trim() || "";
@@ -43,6 +43,7 @@ export type EntrySession = {
   id: string;
   kind: "owner" | "guest";
   guest_number: string;
+  daily_number: string | null;
   token_hash: string;
   display_name: string;
 };
@@ -62,7 +63,13 @@ export async function readSession(
     "SELECT * FROM booking.entry_sessions WHERE token_hash=$1 AND expires_at>now() AND (kind='guest' OR credential_version=(SELECT credential_version::text FROM booking.owner_credentials WHERE id=1))",
     [digest(token)],
   );
-  return r.rows[0] || null;
+  const session = r.rows[0];
+  if (!session) return null;
+  // Owner access must not depend on guest numbering being available.
+  const dailyNumber = session.kind === "guest"
+    ? (await database().query("SELECT booking.guest_display_number($1::bigint) AS number", [session.guest_number])).rows[0].number
+    : null;
+  return { ...session, daily_number: dailyNumber };
 }
 export function requestToken(request: Request) {
   if (process.env.BARAKA_EDGE === "true") {
@@ -87,12 +94,16 @@ export async function newSession(kind: "guest" | "owner", oldToken?: string) {
       await c.query("DELETE FROM booking.entry_sessions WHERE token_hash=$1", [
         digest(oldToken),
       ]);
-    return (
+    const created = (
       await c.query(
         "INSERT INTO booking.entry_sessions(token_hash,kind,expires_at,credential_version,guest_number) VALUES($1,$2,now()+interval '8 hours',$3,CASE WHEN $2='guest' THEN nextval('booking.entry_sessions_guest_number_seq') ELSE NULL END) RETURNING *",
         [digest(token), kind, currentVersion],
       )
     ).rows[0];
+    if (kind === "owner") return { ...created, daily_number: null };
+    return { ...created, daily_number: (await c.query(
+      "SELECT booking.guest_display_number($1::bigint) AS number", [created.guest_number],
+    )).rows[0].number };
   });
   return { token, session: row as EntrySession };
 }

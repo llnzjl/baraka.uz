@@ -4,19 +4,19 @@ import { transaction } from "../booking/db";
 import { recordedTransaction } from "../booking/records";
 import { BookingError, instant } from "../booking/validation";
 import { orderSchema, OrderInput, OrderItem } from "./validation";
-import type { PoolClient } from "pg";
+import type { DatabaseClient } from "../booking/db";
 
-async function guest(c: PoolClient, id: string) {
+async function guest(c: DatabaseClient, id: string) {
   const s = (
     await c.query(
-      "SELECT * FROM booking.entry_sessions WHERE id=$1 AND kind='guest' AND expires_at>now()",
+      "SELECT *,booking.guest_display_number(guest_number) AS daily_number FROM booking.entry_sessions WHERE id=$1 AND kind='guest' AND expires_at>now()",
       [id],
     )
   ).rows[0];
   if (!s) throw new BookingError("UNAUTHORIZED", 401);
   return s;
 }
-async function serviceOpen(c: PoolClient) {
+async function serviceOpen(c: DatabaseClient) {
   return Boolean(
     (
       await c.query(`SELECT 1 FROM booking.opening_hours WHERE weekday=EXTRACT(DOW FROM statement_timestamp() AT TIME ZONE 'Asia/Seoul')
@@ -114,7 +114,7 @@ export async function createOrder(raw: OrderInput, sessionId: string) {
           v.idempotencyKey,
           hash,
           s.guest_number,
-          s.display_name || `Guest ${s.guest_number}`,
+          s.display_name || `Guest ${s.daily_number}`,
           table.id,
           table.name,
           JSON.stringify(items),
@@ -130,9 +130,11 @@ export async function createOrder(raw: OrderInput, sessionId: string) {
     return r;
   });
 }
-const publicColumns =
+const storedColumns =
   "id,queue_number,reference,guest_number,guest_name,table_id,table_name,items,estimated_total,status,version,created_at,updated_at";
-const ownerColumns = publicColumns.split(",").map((column) => `o.${column}`).join(",");
+const publicColumns = storedColumns.replace("guest_number", "booking.guest_display_number(guest_number) AS guest_number");
+const ownerColumns = storedColumns.split(",").map((column) => column === "guest_number"
+  ? "booking.guest_display_number(o.guest_number) AS guest_number" : `o.${column}`).join(",");
 export async function guestOrders(sessionId: string) {
   return transaction(async (c) => {
     const s = await guest(c, sessionId);
@@ -156,7 +158,7 @@ export async function adminOrders(actor: string, date?: string) {
           CASE WHEN receipt.id IS NULL THEN NULL ELSE jsonb_build_object(
             'receipt_number',receipt.receipt_number,'served_at',receipt.served_at,
             'reference',receipt.reference,'table_name',receipt.table_name,
-            'guest_number',receipt.guest_number,'guest_name',receipt.guest_name,
+            'guest_number',booking.guest_display_number(receipt.guest_number),'guest_name',receipt.guest_name,
             'items',receipt.items,'estimated_total',receipt.estimated_total) END AS receipt
          FROM booking.dining_orders o LEFT JOIN booking.order_receipts receipt ON receipt.order_id=o.id
          WHERE o.purge_at>now() AND ${date ? "o.created_at>=$1 AND o.created_at<$2" : "o.status IN ('queued','preparing','ready')"} ORDER BY o.queue_number ASC LIMIT 501`,
@@ -230,7 +232,7 @@ export async function changeOrderStatus(
       [actor, `order ${status}`, id],
     );
     const receipt = status === "served"
-      ? (await c.query("SELECT receipt_number,served_at,reference,table_name,guest_number,guest_name,items,estimated_total FROM booking.order_receipts WHERE order_id=$1", [id])).rows[0]
+      ? (await c.query("SELECT receipt_number,served_at,reference,table_name,booking.guest_display_number(guest_number) AS guest_number,guest_name,items,estimated_total FROM booking.order_receipts WHERE order_id=$1", [id])).rows[0]
       : null;
     return { ...updated, receipt };
   });

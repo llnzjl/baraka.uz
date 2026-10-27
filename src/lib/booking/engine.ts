@@ -1,5 +1,5 @@
 import { recordedTransaction } from "./records";
-import { PoolClient } from "pg";
+import type { DatabaseClient } from "./db";
 import { createHash, randomBytes } from "crypto";
 import { database, transaction } from "./db";
 import {
@@ -114,7 +114,7 @@ export function slotsFor(
   return result;
 }
 async function load(
-  c: PoolClient,
+  c: DatabaseClient,
   date: string,
   write = false,
 ): Promise<State> {
@@ -218,7 +218,7 @@ export async function availability(date: string, guests: number) {
     };
   });
 }
-export async function enqueue(c: PoolClient, r: Record<string, any>) {
+export async function enqueue(c: DatabaseClient, r: Record<string, any>) {
   const translated: Record<string, Record<string, string>> = {
     ko: {
       confirmed: "예약 확정",
@@ -270,7 +270,7 @@ export async function enqueue(c: PoolClient, r: Record<string, any>) {
 function receipt(r: Record<string, any>) {
   return {
     reference: r.reference,
-    guestNumber: r.guest_number,
+    guestNumber: r.daily_number,
     status: r.status,
     date: seoulDate(new Date(r.starts_at)),
     time: new Date(new Date(r.starts_at).getTime() + 9 * 3600000)
@@ -292,7 +292,7 @@ export async function createReservation(
     const state = await load(c, input.date, true);
     const old = (
       await c.query(
-        "SELECT * FROM booking.reservations WHERE idempotency_key=$1",
+        "SELECT *,booking.guest_display_number(guest_number) AS daily_number FROM booking.reservations WHERE idempotency_key=$1",
         [idempotencyKey],
       )
     ).rows[0];
@@ -320,19 +320,19 @@ export async function createReservation(
     const profile = guestNumber
       ? (
           await c.query(
-            "SELECT display_name FROM booking.entry_sessions WHERE guest_number=$1 AND kind='guest' AND expires_at>now()",
+            "SELECT display_name,booking.guest_display_number(guest_number) AS daily_number FROM booking.entry_sessions WHERE guest_number=$1 AND kind='guest' AND expires_at>now()",
             [guestNumber],
           )
         ).rows[0]
       : null;
     if (guestNumber && !profile) throw new BookingError("UNAUTHORIZED", 401);
     const guestName = guestNumber
-      ? profile.display_name || `Guest ${guestNumber}`
+      ? profile.display_name || `Guest ${profile.daily_number}`
       : input.name;
     const r = (
       await c.query(
         `INSERT INTO booking.reservations(reference,idempotency_key,request_hash,name,phone,email,notes,guests,starts_at,ends_at,status,locale,privacy_version,source,created_by,purge_at,guest_number,guest_name)
-   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *,booking.guest_display_number(guest_number) AS daily_number`,
         [
           `BRK-${randomBytes(8).toString("hex").toUpperCase()}`,
           idempotencyKey,
@@ -434,7 +434,7 @@ export async function listReservations(date: string, actor: string) {
     ]);
     return (
       await c.query(
-        `SELECT r.id,r.reference,r.guest_number,r.guest_name,r.name,r.phone,r.email,r.notes,r.ordered_items,r.guests,r.starts_at,r.ends_at,r.status,r.version,r.locale,
+        `SELECT r.id,r.reference,booking.guest_display_number(r.guest_number) AS guest_number,r.guest_name,r.name,r.phone,r.email,r.notes,r.ordered_items,r.guests,r.starts_at,r.ends_at,r.status,r.version,r.locale,
     COALESCE((SELECT json_agg(t.name) FROM booking.table_allocations a JOIN booking.dining_tables t ON a.table_id=t.id WHERE a.reservation_id=r.id),'[]') AS tables
     FROM booking.reservations r WHERE r.starts_at >= $1 AND r.starts_at < $2 ORDER BY r.starts_at`,
         [instant(date, 0), instant(date, 1440)],

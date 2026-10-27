@@ -10,6 +10,7 @@
 
 # next.js
 /.next/
+/.next-dev/
 /out/
 
 # production
@@ -43,8 +44,14 @@ next-env.d.ts
 /.qa-tools/
 /.next-booking-qa/
 /.next-booking-live-test/
+/.next-daily-guests/
 
 .local-db/
+/.baraka-data/
+/.next-sqlite-build/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 
 # Private reservation text records and atomic temporary files
 /reservations.txt
@@ -54,3 +61,5 @@ next-env.d.ts
 /orders.txt.*.tmp
 /receipts.txt
 /receipts.txt.*.tmp
+/history.txt
+/history.txt.*.tmp

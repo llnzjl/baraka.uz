@@ -29,13 +29,13 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - name: Install dependencies
         run: npm ci
       - name: Run unit tests
         run: npm test
-      - name: Run PostgreSQL concurrency and workflow tests
+      - name: Run SQLite concurrency and workflow tests
         run: npm run test:db
       - name: Report backend configuration status
         shell: bash

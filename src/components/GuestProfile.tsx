@@ -90,7 +90,7 @@ export default function GuestProfile() {
         <p role="alert">{error}</p>
         <small>
           You can change this later using “Edit name.” Your guest number stays
-          the same. The name appears in your reservation and the restaurant’s
+          the same for this session. Numbering restarts each day at midnight in Korea. The name appears in your reservation and the restaurant’s
           private records.
         </small>
       </section>

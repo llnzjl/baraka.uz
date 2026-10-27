@@ -1,5 +1,7 @@
 # GitHub Pages with Deno Deploy and PostgreSQL
 
+This is the optional hosted PostgreSQL setup. For the local app without a database server, use [SQLite](sqlite.md). Set `DATABASE_DRIVER=postgres` explicitly for the Deno API and its migrations.
+
 The website stays on GitHub Pages at `https://llnzjl.github.io/baraka/`. Its API runs separately from `backend/index.ts` on Deno Deploy and stores reservations, orders, owner sessions, menu edits and exports in PostgreSQL.
 
 ## One-time hosting setup
@@ -29,6 +31,6 @@ The optional Resend variables are unused because email delivery was removed. `OW
 
 ## Local API
 
-Run PostgreSQL locally using `node scripts/local-database.mjs`, configure private values in ignored `.env.local`, then start the existing Next.js development server with `npm run dev`. Local `/api/...` requests continue to use Next.js route handlers. To exercise the Deno adapter itself, install Deno 2 and run `deno check backend/index.ts`; set the required environment values before running it. `npm test` and `npm run test:db` cover validation and PostgreSQL booking/concurrency behavior.
+Run PostgreSQL locally using `node scripts/local-postgres.mjs`, configure private values in ignored `.env.local`, then start the existing Next.js development server with `npm run dev`. Local `/api/...` requests continue to use Next.js route handlers. To exercise the Deno adapter itself, install Deno 2 and run `deno check backend/index.ts`; set the required environment values before running it. `npm test` and `npm run test:postgres` cover validation and PostgreSQL booking/concurrency behavior.
 
 Deno Deploy's free plan is usage-limited and has no uptime SLA; Neon Free also has resource limits and may suspend compute when idle. Check current provider limits and recovery/backup options before accepting real customer information. Both hosting accounts and their configuration must belong to the restaurant owner.

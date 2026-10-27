@@ -21,6 +21,7 @@ import * as adminOrderRoute from "../src/app/api/admin/orders/[id]/route.ts";
 import * as orderCountRoute from "../src/app/api/admin/orders/count/route.ts";
 import * as orderRecordsRoute from "../src/app/api/admin/orders/records/route.ts";
 import * as receiptsRoute from "../src/app/api/admin/orders/receipts/route.ts";
+import * as historyRoute from "../src/app/api/admin/history/route.ts";
 import * as notificationsRoute from "../src/app/api/jobs/notifications/route.ts";
 import * as recordsJobRoute from "../src/app/api/jobs/records/route.ts";
 import * as retentionRoute from "../src/app/api/jobs/retention/route.ts";
@@ -71,6 +72,7 @@ function routeModule(path: string, method: string) {
   if (path === "/admin/orders/count") return orderCountRoute;
   if (path === "/admin/orders/records") return orderRecordsRoute;
   if (path === "/admin/orders/receipts") return receiptsRoute;
+  if (path === "/admin/history") return historyRoute;
   if (path === "/jobs/notifications") return notificationsRoute;
   if (path === "/jobs/records") return recordsJobRoute;
   if (path === "/jobs/retention") return retentionRoute;

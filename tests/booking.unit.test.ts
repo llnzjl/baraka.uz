@@ -1,4 +1,5 @@
 import { orderSchema, orderStatusSchema } from "../src/lib/orders/validation";
+import { origin } from "../src/lib/booking/http";
 import { guestProfileSchema } from "../src/lib/booking/validation";
 import { ownerPasswordMeetsRules } from "../src/lib/booking/validation";
 import { orderedItemsSchema } from "../src/lib/booking/validation";
@@ -12,6 +13,36 @@ import {
   seoulDate,
 } from "../src/lib/booking/validation";
 const now = new Date("2027-01-01T00:00:00Z");
+test("local origin normalization accepts the exact loopback Host without weakening configured origins", () => {
+  const previousMode = process.env.NODE_ENV;
+  const previousOrigin = process.env.APP_ORIGIN;
+  const env = process.env as Record<string, string | undefined>;
+  const request = (value?: string, host = "127.0.0.1:3000") => new Request("http://localhost:3000/api/session", {
+    headers: { host, ...(value ? { origin: value } : {}) },
+  });
+  try {
+    env.NODE_ENV = "development";
+    delete env.APP_ORIGIN;
+    assert.doesNotThrow(() => origin(request("http://127.0.0.1:3000")));
+    assert.doesNotThrow(() => origin(request("http://localhost:3000", "localhost:3000")));
+    assert.doesNotThrow(() => origin(request("http://[::1]:3000", "[::1]:3000")));
+    for (const candidate of [request(), request("null"), request("https://evil.example"),
+      request("http://127.0.0.1:3001", "127.0.0.1:3001"), request("http://127.0.0.1:3000", "localhost:3000"),
+      request("https://127.0.0.1:3000"), request("http://127.0.0.1:3000/path")]) {
+      assert.throws(() => origin(candidate), /FORBIDDEN/);
+    }
+    env.APP_ORIGIN = "http://localhost:3000";
+    assert.throws(() => origin(request("http://127.0.0.1:3000")), /FORBIDDEN/);
+    env.NODE_ENV = "production";
+    assert.doesNotThrow(() => origin(request("http://localhost:3000", "localhost:3000")));
+    assert.throws(() => origin(request("http://127.0.0.1:3000")), /FORBIDDEN/);
+    delete env.APP_ORIGIN;
+    assert.throws(() => origin(request("http://127.0.0.1:3000")), /UNAVAILABLE/);
+  } finally {
+    if (previousMode === undefined) delete env.NODE_ENV; else env.NODE_ENV = previousMode;
+    if (previousOrigin === undefined) delete env.APP_ORIGIN; else env.APP_ORIGIN = previousOrigin;
+  }
+});
 const state = (): State => ({
   config: {
     enabled: true,

@@ -24,7 +24,11 @@ No extra external account is needed beyond the existing PostgreSQL/owner authent
 
 `orders.txt` in the project root contains:
 
-`Year | Month | Day | Received time | Queue number | Table | Guest number | Customer name | Ordered items | Status | Estimated KRW | Reference`
+`Year | Month | Day | Received time | Queue number | Table | Guest number | Customer name | Ordered items | Status | Estimated KRW | Reference | Guest numbering date`
+
+Guest display numbers restart at 1 each day at midnight in Asia/Seoul. Permanent internal identities continue to isolate order access, retries and profile changes. Migration `016_daily_guest_numbers.sql` must be applied before running this version; existing records keep their original numbers. The guest numbering date identifies which day's Guest 1 made a reservation or order, even if the reservation date or meal serving date is later.
+
+`history.txt` combines the retained dated orders, reservations and served receipts, including guest names, numbers and item quantities. It refreshes with the existing private exports and can be downloaded using **Download guest history (.txt)** on the owner Orders page (`GET /api/admin/history`). Set `HISTORY_RECORDS_PATH` to override its private location. Edge deployments store the same snapshot in `booking.records_export.history_text`. A daily reset never clears history; the existing retention and deletion policy still applies.
 
 `receipts.txt` contains one private record per order marked served, including the serving time, table/customer, item snapshot, receipt number and estimated amount. It is an internal order record, not proof that a bill was paid or a tax invoice.
 
@@ -48,4 +52,4 @@ Set `ORDERS_RECORDS_PATH` and `RECEIPTS_RECORDS_PATH` to optional private persis
 
 ## Verification
 
-`npm test` covers input limits and spoofed fields. `npm run test:db` uses isolated PostgreSQL for concurrent duplicate submissions, server-side totals, FIFO enforcement, concurrent staff updates, customer isolation, invalid/inactive tables, closed days, unknown menu IDs/prices, status transitions, profile names, private exports and retention. Tests write text files only under `.test-db/`; they never add orders to the restaurant database. Browser verification also used an isolated database to exercise two customer orders, the owner queue, live status updates and duplicate-request retry.
+`npm test` covers input limits and spoofed fields. `npm run test:db` uses isolated SQLite for concurrent duplicate submissions, server-side totals, FIFO enforcement, concurrent staff updates, customer isolation, invalid/inactive tables, closed days, unknown menu IDs/prices, status transitions, profile names, private exports and retention. Tests write text files only under `.test-db/`; they never add orders to the restaurant database. Browser verification also used an isolated database to exercise two customer orders, the owner queue, live status updates and duplicate-request retry.

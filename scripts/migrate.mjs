@@ -1,6 +1,15 @@
 import { readFile, readdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import pg from "pg";
+const driver = process.env.DATABASE_DRIVER || (process.env.DATABASE_URL || process.env.MIGRATION_DATABASE_URL ? "postgres" : "sqlite");
+if (driver === "sqlite") {
+  const { SQLitePool } = await import("../db/sqlite.mjs");
+  const database = new SQLitePool();
+  console.log(`SQLite schema ready: ${database.filename}`);
+  await database.end();
+  process.exit(0);
+}
+if (driver !== "postgres") throw new Error("DATABASE_DRIVER must be sqlite or postgres.");
 const connectionString =
   process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL;
 if (!connectionString)
@@ -20,7 +29,11 @@ try {
         new URL(`../db/migrations/${name}`, import.meta.url),
         "utf8",
       ),
-      hash = createHash("sha256").update(sql).digest("hex");
+      // Git checkouts can change line endings on Windows. Compare SQL content
+      // consistently while still accepting previously stored raw-file hashes.
+      normalized = sql.replace(/\r\n/g, "\n"),
+      hash = createHash("sha256").update(normalized).digest("hex"),
+      windowsHash = createHash("sha256").update(normalized.replace(/\n/g, "\r\n")).digest("hex");
     const old = (
       await client.query(
         "SELECT checksum FROM public.booking_migrations WHERE name=$1",
@@ -28,7 +41,7 @@ try {
       )
     ).rows[0];
     if (old) {
-      if (old.checksum !== hash)
+      if (old.checksum !== hash && old.checksum !== windowsHash)
         throw new Error(`Migration changed after application: ${name}`);
       continue;
     }

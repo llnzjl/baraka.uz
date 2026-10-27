@@ -68,8 +68,23 @@ export function origin(request: Request) {
   if (process.env.NODE_ENV === "production" && !expected)
     throw new BookingError("UNAVAILABLE", 503);
   const origin = request.headers.get("origin");
-  if (!origin || origin !== (expected || new URL(request.url).origin))
-    throw new BookingError("FORBIDDEN", 403);
+  const url = new URL(request.url);
+  if (origin && origin === (expected || url.origin)) return;
+  // Next's dev server can normalize request.url to localhost even when the
+  // browser opened 127.0.0.1. Require the browser's exact Host and port, and
+  // restrict this fallback to loopback development without a configured origin.
+  if (origin && !expected && process.env.NODE_ENV !== "production") {
+    try {
+      const browserOrigin = new URL(origin);
+      const loopback = (host: string) => ["localhost", "127.0.0.1", "[::1]"].includes(host);
+      if (loopback(url.hostname) && loopback(browserOrigin.hostname) &&
+          browserOrigin.protocol === url.protocol &&
+          browserOrigin.port === url.port &&
+          browserOrigin.origin === origin &&
+          browserOrigin.host === request.headers.get("host")) return;
+    } catch { /* Malformed origins are rejected below. */ }
+  }
+  throw new BookingError("FORBIDDEN", 403);
 }
 export function clientIp(request: Request) {
   const header = process.env.TRUSTED_IP_HEADER;

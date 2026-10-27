@@ -9,8 +9,12 @@
     "lint": "next lint",
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "test": "tsx --test tests/booking.unit.test.ts",
-    "test:db": "node scripts/test-database.mjs",
-    "test:integration": "node --env-file=.env.test.local --import tsx --test tests/booking.integration.test.ts"
+    "test:db": "node scripts/test-sqlite.mjs",
+    "test:integration": "node --env-file=.env.test.local --import tsx --test tests/booking.integration.test.ts",
+    "test:postgres": "node scripts/test-database.mjs",
+    "db:import-postgres": "node --env-file=.env.local scripts/import-postgres.mjs",
+    "db:backup": "node --env-file=.env.local scripts/backup-sqlite.mjs",
+    "test:sqlite:http": "node scripts/test-sqlite-http.mjs"
   },
   "dependencies": {
     "@imagemagick/magick-wasm": "^0.0.30",
@@ -40,7 +44,7 @@
     "typescript": "5.9"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.0.0"
   },
   "overrides": {
     "postcss": "$postcss"

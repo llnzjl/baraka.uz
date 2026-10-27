@@ -7,6 +7,8 @@ import {
 } from "../src/lib/orders/engine";
 import { changeGuestName, sessionView } from "../src/lib/booking/guest-profile";
 import { syncRecords } from "../src/lib/booking/records";
+import { saveMenuItem, menuImage, publicMenu } from "../src/lib/menu/engine";
+import { POST as signIn, GET as sessionStatus, DELETE as signOut } from "../src/app/api/session/route";
 import path from "node:path";
 import { unlink } from "node:fs/promises";
 import {
@@ -39,16 +41,20 @@ import {
   seoulDate,
   instant,
 } from "../src/lib/booking/validation";
+const sqlite = process.env.TEST_SQLITE === "true";
+const sqliteFile = path.resolve(".test-db", "sqlite-" + randomUUID() + ".sqlite");
 const url = process.env.TEST_DATABASE_URL;
 if (
-  !url ||
+  !sqlite && (!url ||
   process.env.ALLOW_TEST_DB_RESET !== "true" ||
-  !new URL(url).pathname.endsWith("_test")
+  !new URL(url).pathname.endsWith("_test"))
 )
   throw new Error(
     "Use a disposable database ending _test and ALLOW_TEST_DB_RESET=true.",
   );
-process.env.DATABASE_URL = url;
+process.env.DATABASE_DRIVER = sqlite ? "sqlite" : "postgres";
+if (sqlite) process.env.SQLITE_PATH = sqliteFile;
+else process.env.DATABASE_URL = url;
 const initialOwnerSalt = "a".repeat(64);
 process.env.OWNER_USERNAME = "test-owner";
 process.env.OWNER_PASSWORD_HASH = `${initialOwnerSalt}:${scryptSync("test-password", initialOwnerSalt, 64).toString("hex")}`;
@@ -56,6 +62,10 @@ const recordsPath = path.resolve(".test-db", `records-${randomUUID()}.txt`);
 process.env.RESERVATION_RECORDS_PATH = recordsPath;
 const ordersPath = path.resolve(".test-db", `orders-${randomUUID()}.txt`);
 process.env.ORDERS_RECORDS_PATH = ordersPath;
+const historyPath = path.resolve(".test-db", `history-${randomUUID()}.txt`);
+process.env.HISTORY_RECORDS_PATH = historyPath;
+const receiptsPath = path.resolve(".test-db", `receipts-${randomUUID()}.txt`);
+process.env.RECEIPTS_RECORDS_PATH = receiptsPath;
 process.env.OWNER_EMAIL = "owner@example.invalid";
 process.env.RESEND_API_KEY = "test-only";
 process.env.RESEND_FROM = "test@example.invalid";
@@ -76,6 +86,7 @@ function input(extra: Record<string, unknown> = {}) {
   });
 }
 before(async () => {
+  if (sqlite) { database(); return; }
   await database().query("DROP SCHEMA IF EXISTS booking CASCADE");
   await database().query(
     await readFile("db/migrations/001_reservations.sql", "utf8"),
@@ -101,16 +112,29 @@ before(async () => {
   await database().query(await readFile("db/migrations/012_owner_profile.sql", "utf8"));
   await database().query(await readFile("db/migrations/013_owner_email.sql", "utf8"));
   await database().query(await readFile("db/migrations/014_remove_owner_email_auth.sql", "utf8"));
+  await database().query(await readFile("db/migrations/015_edge_records_snapshot.sql", "utf8"));
+  await database().query(await readFile("db/migrations/016_daily_guest_numbers.sql", "utf8"));
 });
 after(async () => {
   await database().end();
+  if (sqlite) for (const suffix of ["", "-wal", "-shm"]) await unlink(sqliteFile + suffix).catch(() => {});
   await unlink(recordsPath).catch(() => {});
   await unlink(ordersPath).catch(() => {});
+  await unlink(historyPath).catch(() => {});
+  await unlink(receiptsPath).catch(() => {});
 });
 async function reset() {
   await database().query("DELETE FROM booking.entry_sessions");
   await newSession("owner");
-  await database().query(
+  if (sqlite) {
+    const c = await database().connect();
+    try {
+      await c.query("BEGIN");
+      for (const table of ["audit_log","order_receipts","dining_orders","table_allocations","notifications","reservations","dining_tables","opening_hours","closed_dates"])
+        await c.query("DELETE FROM booking." + table);
+      await c.query("COMMIT");
+    } finally { c.release(); }
+  } else await database().query(
     "TRUNCATE booking.reservations,booking.table_allocations,booking.notifications,booking.audit_log,booking.dining_tables,booking.opening_hours,booking.closed_dates CASCADE",
   );
   await database().query(
@@ -128,6 +152,19 @@ test("fresh migration is closed and contains no invented capacity", async () => 
   const a = await availability(date, 2);
   assert.equal(a.enabled, false);
   assert.deepEqual(a.slots, []);
+});
+
+test("menu changes persist prices, visibility and image bytes across updates", async () => {
+  const bytes = Buffer.from([0, 255, 2, 128]);
+  const input = { id: "storage-test-dish", name: "Storage test", ko: "Storage test", category: "mains", price: 1000 };
+  const created = await saveMenuItem(input, actor, { bytes, type: "image/png" });
+  assert.equal(created.price, 1000);
+  assert.deepEqual((await menuImage(created.id)).bytes, bytes);
+  const updated = await saveMenuItem({ ...input, price: 2000, active: false }, actor);
+  assert.equal(updated.price, 2000);
+  assert.equal(updated.active, false);
+  assert.equal((await publicMenu()).some(item => item.id === created.id), false);
+  await assert.rejects(menuImage(created.id), /NOT_FOUND/);
 });
 test("20 concurrent reservations on one table yield exactly one committed booking", async () => {
   await reset();
@@ -354,7 +391,7 @@ test("safe capacity changes preserve bookings and unsafe closures are rejected",
   );
 });
 
-test("runtime role can read booking data but cannot grant admin access", async () => {
+test("runtime role can read booking data but cannot grant admin access", { skip: sqlite }, async () => {
   const c = await database().connect();
   try {
     await c.query("BEGIN");
@@ -372,7 +409,7 @@ test("runtime role can read booking data but cannot grant admin access", async (
     c.release();
   }
 });
-test("untrusted role cannot read private booking schema", async () => {
+test("untrusted role cannot read private booking schema", { skip: sqlite }, async () => {
   const c = await database().connect();
   try {
     await c.query(
@@ -434,7 +471,7 @@ test("guest accounts have unique sequential numbers and hashed, revocable sessio
     Array.from({ length: 10 }, () => newSession("guest")),
   );
   const numbers = sessions
-    .map((s) => Number(s.session.guest_number))
+    .map((s) => Number(s.session.daily_number))
     .sort((a, b) => a - b);
   assert.equal(new Set(numbers).size, 10);
   assert.equal(numbers[9] - numbers[0], 9);
@@ -447,7 +484,7 @@ test("guest accounts have unique sequential numbers and hashed, revocable sessio
     undefined,
     first.session.guest_number,
   );
-  assert.equal(booking.guestNumber, first.session.guest_number);
+  assert.equal(booking.guestNumber, first.session.daily_number);
   await endSession(first.token);
   assert.equal(await readSession(first.token), null);
 });
@@ -455,6 +492,47 @@ test("owner passwords are verified using a salted hash", async () => {
   assert.equal(await verifyOwner("test-owner", "test-password"), true);
   assert.equal(await verifyOwner("test-owner", "wrong"), false);
   assert.equal(await verifyOwner("wrong", "test-password"), false);
+});
+
+test("owner sign-in and session restoration do not depend on the guest numbering function", { skip: sqlite }, async () => {
+  await database().query("ALTER FUNCTION booking.guest_display_number(bigint) RENAME TO guest_display_number_unavailable");
+  let token: string | undefined;
+  try {
+    assert.equal(await verifyOwner("test-owner", "test-password"), true);
+    const created = await newSession("owner");
+    token = created.token;
+    assert.equal(sessionView(created.session).kind, "owner");
+    assert.equal((await readSession(token))?.kind, "owner");
+  } finally {
+    await database().query("ALTER FUNCTION booking.guest_display_number_unavailable(bigint) RENAME TO guest_display_number");
+    if (token) await endSession(token);
+  }
+});
+
+test("owner can sign in, restore the session and sign out through the loopback API", async () => {
+  const previousOrigin = process.env.APP_ORIGIN;
+  delete process.env.APP_ORIGIN;
+  try {
+    const response = await signIn(new Request("http://localhost:3000/api/session", {
+      method: "POST",
+      headers: { host: "127.0.0.1:3000", origin: "http://127.0.0.1:3000", "content-type": "application/json" },
+      body: JSON.stringify({ kind: "owner", username: "test-owner", password: "test-password" }),
+    }));
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).kind, "owner");
+    const cookie = response.headers.get("set-cookie")!.split(";")[0];
+    const restored = await sessionStatus(new Request("http://localhost:3000/api/session", { headers: { cookie } }));
+    assert.equal((await restored.json()).session.kind, "owner");
+    const logout = await signOut(new Request("http://localhost:3000/api/session", {
+      method: "DELETE", headers: { cookie, host: "127.0.0.1:3000", origin: "http://127.0.0.1:3000" },
+    }));
+    assert.equal(logout.status, 200);
+    const ended = await sessionStatus(new Request("http://localhost:3000/api/session", { headers: { cookie } }));
+    assert.equal((await ended.json()).session, null);
+  } finally {
+    if (previousOrigin === undefined) delete process.env.APP_ORIGIN;
+    else process.env.APP_ORIGIN = previousOrigin;
+  }
 });
 
 test("owner profile updates persist details, change the sign-in name and preserve only the active session", async () => {
@@ -487,7 +565,7 @@ test("10:00 to midnight booking window supports meals across midnight and respec
   await reset();
   await database().query("DELETE FROM booking.opening_hours");
   await database().query(
-    "INSERT INTO booking.opening_hours(weekday,opens,closes) SELECT day,0,1440 FROM generate_series(0,6) AS day",
+    "INSERT INTO booking.opening_hours(weekday,opens,closes) VALUES(0,0,1440),(1,0,1440),(2,0,1440),(3,0,1440),(4,0,1440),(5,0,1440),(6,0,1440)",
   );
   assert.ok((await availability(date, 2)).slots.includes("23:30"));
   const b = await createReservation(input({ time: "23:30" }));
@@ -526,7 +604,7 @@ test("private text records include Seoul date/time, guest number, phone, ordered
   let text = await readFile(recordsPath, "utf8");
   assert.ok(
     text.includes(
-      `${date.replaceAll("-", " | ")} | 12:00 | ${guest.session.guest_number} | Guest ${guest.session.guest_number} | 01012345678 | Not recorded`,
+      `${date.replaceAll("-", " | ")} | 12:00 | ${guest.session.daily_number} | Guest ${guest.session.daily_number} | 01012345678 | Not recorded`,
     ),
   );
   const row = (
@@ -590,7 +668,7 @@ test("guest profile names default to Guest number, persist and update only their
     second = await newSession("guest");
   assert.equal(
     sessionView(first.session).displayName,
-    `Guest ${first.session.guest_number}`,
+    `Guest ${first.session.daily_number}`,
   );
   await changeGuestName(first.token, "Customer One");
   const booking = await createReservation(
@@ -605,15 +683,15 @@ test("guest profile names default to Guest number, persist and update only their
   );
   assert.ok(
     (await readFile(recordsPath, "utf8")).includes(
-      `${first.session.guest_number} | Customer One | 01012345678`,
+      `${first.session.daily_number} | Customer One | 01012345678`,
     ),
   );
   const renamed = await changeGuestName(first.token, "Updated name");
-  assert.equal(renamed.number, first.session.guest_number);
+  assert.equal(renamed.number, first.session.daily_number);
   assert.equal((await readSession(first.token))?.display_name, "Updated name");
   assert.ok(
     (await readFile(recordsPath, "utf8")).includes(
-      `${first.session.guest_number} | Updated name | 01012345678`,
+      `${first.session.daily_number} | Updated name | 01012345678`,
     ),
   );
   const rows = (
@@ -627,7 +705,7 @@ test("guest profile names default to Guest number, persist and update only their
   );
   assert.equal(
     rows.find((r) => r.reference === another.reference).guest_name,
-    `Guest ${second.session.guest_number}`,
+    `Guest ${second.session.daily_number}`,
   );
   await endSession(first.token);
   await assert.rejects(() => changeGuestName(first.token, "Expired change"));
@@ -644,7 +722,7 @@ async function orderSetup() {
   await reset();
   await database().query("DELETE FROM booking.opening_hours");
   await database().query(
-    "INSERT INTO booking.opening_hours(weekday,opens,closes) SELECT day,0,1440 FROM generate_series(0,6) AS day",
+    "INSERT INTO booking.opening_hours(weekday,opens,closes) VALUES(0,0,1440),(1,0,1440),(2,0,1440),(3,0,1440),(4,0,1440),(5,0,1440),(6,0,1440)",
   );
   const session = await newSession("guest");
   const table = (await database().query("SELECT id FROM booking.dining_tables"))
@@ -839,4 +917,57 @@ test("order stays received when the text filesystem fails; retry repairs the pri
   }
   await syncRecords();
   assert.ok((await readFile(ordersPath, "utf8")).includes("2 x Plov"));
+});
+
+test("daily guest numbers restart at 1, survive logout, and isolate dated history across days", async () => {
+  const { table } = await orderSetup();
+  // Move prior fixtures out of today to simulate a fresh day without changing
+  // the server clock or resetting the permanent identity sequence.
+  await database().query("UPDATE booking.guest_numbers SET guest_date='2000-01-01'");
+  const yesterday = await newSession("guest");
+  assert.equal(sessionView(yesterday.session).number, "1");
+  const oldOrder = await createOrder(orderInput(table), yesterday.session.id);
+  const oldBooking = await createReservation(input(), undefined, yesterday.session.guest_number);
+  await changeOrderStatus(oldOrder.id, "preparing", 1, actor);
+  await changeOrderStatus(oldOrder.id, "ready", 2, actor);
+  await changeOrderStatus(oldOrder.id, "served", 3, actor);
+  await database().query(`UPDATE booking.guest_numbers SET guest_date=(now() AT TIME ZONE 'Asia/Seoul')::date-1 WHERE guest_id=$1`, [yesterday.session.guest_number]);
+  await database().query("UPDATE booking.dining_orders SET created_at=created_at-interval '1 day' WHERE id=$1", [oldOrder.id]);
+  await database().query("UPDATE booking.entry_sessions SET expires_at=now()-interval '1 second' WHERE id=$1", [yesterday.session.id]);
+
+  const today = await Promise.all(Array.from({ length: 10 }, () => newSession("guest")));
+  assert.deepEqual(today.map(s => Number(s.session.daily_number)).sort((a,b) => a-b), [1,2,3,4,5,6,7,8,9,10]);
+  const first = today.find(s => s.session.daily_number === "1")!;
+  assert.notEqual(first.session.guest_number, yesterday.session.guest_number);
+  assert.equal(await readSession(yesterday.token), null);
+  assert.deepEqual(await guestOrders(first.session.id), []);
+  await assert.rejects(() => createOrder(orderInput(table), yesterday.session.id), /UNAUTHORIZED/);
+  const currentOrder = await createOrder(orderInput(table), first.session.id);
+  const newBooking = await createReservation(input({time: "13:30"}), undefined, first.session.guest_number);
+  assert.equal(newBooking.guestNumber, "1");
+  await changeGuestName(first.token, "Today's customer");
+  const priorName = (await database().query("SELECT guest_name FROM booking.reservations WHERE reference=$1", [oldBooking.reference])).rows[0].guest_name;
+  assert.equal(priorName, "Guest 1");
+  assert.deepEqual((await guestOrders(first.session.id)).map(o => o.id), [currentOrder.id]);
+  const ownerHistory = await adminOrders(actor, seoulDate(new Date(Date.now()-86400000)));
+  assert.equal(ownerHistory.orders.find(o => o.id===oldOrder.id)?.guest_number, "1");
+  assert.equal(ownerHistory.orders.find(o => o.id===oldOrder.id)?.receipt.guest_number, 1);
+  const text = await readFile(historyPath, "utf8");
+  assert.ok(text.includes(oldOrder.reference) && text.includes(currentOrder.reference));
+  assert.ok(text.includes(oldBooking.reference) && text.includes(newBooking.reference));
+  assert.ok(text.includes("Guest 1") && text.includes("2 x Plov"));
+  assert.ok(text.includes(seoulDate()) && text.includes(seoulDate(new Date(Date.now()-86400000))));
+  const expiry = (await database().query(`SELECT expires_at<=(((now() AT TIME ZONE 'Asia/Seoul')::date+1)::timestamp AT TIME ZONE 'Asia/Seoul') AS capped FROM booking.entry_sessions WHERE id=$1`, [first.session.id])).rows[0];
+  assert.equal(expiry.capped, true);
+  await endSession(first.token);
+  assert.equal((await newSession("guest")).session.daily_number, "11");
+
+  process.env.BARAKA_EDGE = "true";
+  try {
+    await syncRecords(true);
+    const snapshot = (await database().query("SELECT history_text FROM booking.records_export WHERE id=1")).rows[0].history_text;
+    assert.ok(snapshot.includes(oldOrder.reference) && snapshot.includes(currentOrder.reference));
+  } finally {
+    delete process.env.BARAKA_EDGE;
+  }
 });

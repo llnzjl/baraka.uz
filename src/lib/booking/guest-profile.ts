@@ -6,10 +6,10 @@ import type { EntrySession } from "./sessions";
 export function sessionView(s: EntrySession) {
   return {
     kind: s.kind,
-    number: s.kind === "guest" ? s.guest_number : null,
+    number: s.kind === "guest" ? s.daily_number : null,
     displayName:
       s.kind === "guest"
-        ? s.display_name || `Guest ${s.guest_number}`
+        ? s.display_name || `Guest ${s.daily_number}`
         : "Owner",
   };
 }
@@ -27,7 +27,7 @@ export async function changeGuestName(
     );
     const s = (
       await c.query(
-        "SELECT * FROM booking.entry_sessions WHERE token_hash=$1 AND kind='guest' AND expires_at>now() FOR UPDATE",
+        "SELECT *,booking.guest_display_number(guest_number) AS daily_number FROM booking.entry_sessions WHERE token_hash=$1 AND kind='guest' AND expires_at>now() FOR UPDATE",
         [createHash("sha256").update(token).digest("hex")],
       )
     ).rows[0];
