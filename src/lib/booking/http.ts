@@ -71,17 +71,17 @@ export function origin(request: Request) {
   const url = new URL(request.url);
   if (origin && origin === (expected || url.origin)) return;
   // Next's dev server can normalize request.url to localhost even when the
-  // browser opened 127.0.0.1. Require the browser's exact Host and port, and
-  // restrict this fallback to loopback development without a configured origin.
+  // browser opened the site through a LAN address. In development, allow only
+  // a same-host Origin whose host and port exactly match the incoming Host.
+  // Production still requires APP_ORIGIN above.
   if (origin && !expected && process.env.NODE_ENV !== "production") {
     try {
       const browserOrigin = new URL(origin);
-      const loopback = (host: string) => ["localhost", "127.0.0.1", "[::1]"].includes(host);
-      if (loopback(url.hostname) && loopback(browserOrigin.hostname) &&
-          browserOrigin.protocol === url.protocol &&
-          browserOrigin.port === url.port &&
+      const requestHost = request.headers.get("host")?.toLowerCase();
+      if (browserOrigin.protocol === url.protocol &&
+          browserOrigin.host === requestHost &&
           browserOrigin.origin === origin &&
-          browserOrigin.host === request.headers.get("host")) return;
+          requestHost) return;
     } catch { /* Malformed origins are rejected below. */ }
   }
   throw new BookingError("FORBIDDEN", 403);
