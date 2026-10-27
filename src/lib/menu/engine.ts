@@ -65,7 +65,7 @@ export async function menuImage(id: string) {
     return { bytes: row.image_data as Buffer, type: row.image_type as string, updatedAt: new Date(row.updated_at).getTime() };
   });
 }
-export async function saveMenuItem(raw: unknown, actor: string, image?: { bytes: Buffer; type: string }) {
+export async function saveMenuItem(raw: unknown, actor: string, image?: { bytes: Buffer; type: string }, removeImage = false) {
   const v = menuItemSchema.parse(raw);
   const id = v.id || `${v.name.toLocaleLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,60) || "dish"}-${randomBytes(4).toString("hex")}`;
   return transaction(async c => {
@@ -75,12 +75,12 @@ export async function saveMenuItem(raw: unknown, actor: string, image?: { bytes:
        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,name_ko=EXCLUDED.name_ko,category=EXCLUDED.category,
        description=EXCLUDED.description,description_ko=EXCLUDED.description_ko,price=EXCLUDED.price,active=EXCLUDED.active,
-       image_data=COALESCE(EXCLUDED.image_data,booking.restaurant_menu.image_data),
-       image_type=COALESCE(EXCLUDED.image_type,booking.restaurant_menu.image_type),
-       image_version=CASE WHEN EXCLUDED.image_data IS NULL THEN booking.restaurant_menu.image_version ELSE gen_random_uuid() END,
+       image_data=CASE WHEN $11 THEN NULL ELSE COALESCE(EXCLUDED.image_data,booking.restaurant_menu.image_data) END,
+       image_type=CASE WHEN $11 THEN NULL ELSE COALESCE(EXCLUDED.image_type,booking.restaurant_menu.image_type) END,
+       image_version=CASE WHEN $11 OR EXCLUDED.image_data IS NOT NULL THEN gen_random_uuid() ELSE booking.restaurant_menu.image_version END,
        updated_at=clock_timestamp()
        RETURNING ${publicColumns}`,
-      [id,v.name,v.ko,v.category,v.description,v.descriptionKo,v.price,v.active,image?.bytes ?? null,image?.type ?? null],
+      [id,v.name,v.ko,v.category,v.description,v.descriptionKo,v.price,v.active,image?.bytes ?? null,image?.type ?? null,removeImage],
     );
     await c.query("INSERT INTO booking.audit_log(actor,action) VALUES($1,$2)",[actor,`menu item saved: ${id}`]);
     return record(result.rows[0]);

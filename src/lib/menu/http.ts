@@ -15,8 +15,9 @@ export async function parseMenuForm(request: Request) {
   try { raw = JSON.parse(String(form.get("item") || "")); }
   catch { throw new BookingError("INVALID_INPUT", 400); }
   const item = menuItemSchema.parse(raw);
+  const removeImage = form.get("removeImage") === "true";
   const file = form.get("image");
-  if (!(file instanceof File) || file.size === 0) return { item, image: undefined };
+  if (!(file instanceof File) || file.size === 0) return { item, image: undefined, removeImage };
   if (file.size > MAX_UPLOAD_BYTES) throw new BookingError("IMAGE_TOO_LARGE", 413);
   const bytes = Buffer.from(await file.arrayBuffer());
   const signatures: [string, number[]][] = [
@@ -40,7 +41,7 @@ export async function parseMenuForm(request: Request) {
         .webp({quality:70,effort:4}).toBuffer();
     }
     if (optimized.length>MAX_STORED_BYTES) throw new BookingError("IMAGE_TOO_LARGE",413);
-    return { item, image: { bytes: optimized, type: "image/webp" } };
+    return { item, image: { bytes: optimized, type: "image/webp" }, removeImage: false };
   } catch (error) {
     if (error instanceof BookingError) throw error;
     throw new BookingError("INVALID_IMAGE",400);

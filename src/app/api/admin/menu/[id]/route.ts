@@ -11,8 +11,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const user = await admin(request);
     const { id } = await params;
     z.string().regex(/^[a-z0-9][a-z0-9-]{0,79}$/).parse(id);
-    const { item, image } = await parseMenuForm(request);
+    const { item, image, removeImage } = await parseMenuForm(request);
     if (item.id !== id) throw new BookingError("INVALID_INPUT", 400);
-    return { item: await saveMenuItem(item, user.id, image) };
+    return { item: await saveMenuItem(item, user.id, image, removeImage) };
   });
 }

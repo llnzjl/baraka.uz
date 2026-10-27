@@ -14,8 +14,8 @@ export async function POST(request: Request) {
   return handle(async () => {
     origin(request);
     const user = await admin(request);
-    const { item, image } = await parseMenuForm(request);
+    const { item, image, removeImage } = await parseMenuForm(request);
     if (item.id) throw new BookingError("INVALID_INPUT", 400);
-    return { item: await saveMenuItem(item, user.id, image) };
+    return { item: await saveMenuItem(item, user.id, image, removeImage) };
   });
 }

@@ -531,6 +531,10 @@
 .menu-editor-image img { width: 100%; aspect-ratio: 1.3; object-fit: cover; background: #e6eeea; }
 .menu-editor-image label { position: relative; display: block; padding: 10px; border: 1px solid #c7a66b; text-align: center; font-size: 12px; cursor: pointer; }
 .menu-editor-image input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
+.menu-editor-image-actions { display: flex; gap: 8px; }
+.menu-editor-image-actions label { flex: 1; }
+.menu-editor-image-actions button { padding: 10px; border: 1px solid #a3483b; background: transparent; color: #8a3027; font-size: 12px; cursor: pointer; }
+.menu-editor-image-actions button:hover { background: #a3483b; color: white; }
 .menu-editor-fields { display: grid; gap: 10px; }
 .menu-editor-fields>label:not(.menu-editor-active) { display: grid; gap: 5px; font-size: 11px; font-weight: 600; color: #102c3c; }
 .menu-editor-fields input:not([type=checkbox]),.menu-editor-fields select,.menu-editor-fields textarea { width: 100%; min-width: 0; border: 1px solid #102c3c30; padding: 9px 10px; background: #fff; color: #102c3c; font: inherit; font-size: 13px; font-weight: 400; }

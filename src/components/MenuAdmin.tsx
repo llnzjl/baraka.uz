@@ -10,7 +10,7 @@ const categories = [
 ];
 export default function MenuAdmin() {
   const [items,setItems]=useState<MenuItem[]>([]), [files,setFiles]=useState<Record<string,File>>({}),
-    [previews,setPreviews]=useState<Record<string,string>>({}), [states,setStates]=useState<Record<string,string>>({}),
+    [previews,setPreviews]=useState<Record<string,string>>({}), [removedPhotos,setRemovedPhotos]=useState<Record<string,boolean>>({}), [states,setStates]=useState<Record<string,string>>({}),
     [error,setError]=useState(""), [loaded,setLoaded]=useState(false), [query,setQuery]=useState(""), [focusId,setFocusId]=useState("");
   const dirty=useRef(new Set<string>()), versions=useRef<Record<string,number>>({});
   const load=useCallback(async()=>{
@@ -38,11 +38,12 @@ export default function MenuAdmin() {
   };
   const save=useCallback(async(id:string)=>{
     const item=items.find(x=>x.id===id); if(!item)return;
-    const version=versions.current[id]||0, file=files[id];
+    const version=versions.current[id]||0, file=files[id], removeImage=removedPhotos[id]===true;
     setStates(old=>({...old,[id]:"Saving…"}));
     const form=new FormData();
     form.set("item",JSON.stringify({id:item.id,name:item.name,ko:item.ko,category:item.category,description:item.description,descriptionKo:item.descriptionKo,price:item.price,active:item.active}));
     if(file) form.set("image",file,file.name);
+    if(removeImage) form.set("removeImage","true");
     try {
       const r=await apiFetch(`/api/admin/menu/${encodeURIComponent(id)}`,{method:"PATCH",body:form});
       const d=await r.json(); if(!r.ok) throw new Error(d.error==="IMAGE_TOO_LARGE"?"Photo must be at most 100 MB and 100 megapixels.":d.error==="INVALID_IMAGE"?"Use a valid JPEG, PNG or WebP image.":"Could not save this dish. Check the fields and try again.");
@@ -50,10 +51,11 @@ export default function MenuAdmin() {
         setItems(old=>old.map(x=>x.id===id?d.item:x));
         setFiles(old=>{const next={...old}; delete next[id]; return next;});
         setPreviews(old=>{const next={...old}; delete next[id]; return next;});
+        setRemovedPhotos(old=>{const next={...old}; delete next[id]; return next;});
         dirty.current.delete(id); setStates(old=>({...old,[id]:"Saved"}));
       }
     } catch(e) { dirty.current.delete(id); setStates(old=>({...old,[id]:(e as Error).message})); }
-  },[files,items]);
+  },[files,items,removedPhotos]);
   useEffect(()=>{
     if(!dirty.current.size)return;
     const timer=setTimeout(()=>{for(const id of Array.from(dirty.current)) void save(id);},900);
@@ -74,7 +76,15 @@ export default function MenuAdmin() {
     if(!file)return;
     if(file.size>100*1024*1024){setStates(old=>({...old,[id]:"Photo must be 100 MB or smaller."}));return;}
     setFiles(old=>({...old,[id]:file}));
+    setRemovedPhotos(old=>({...old,[id]:false}));
     const reader=new FileReader(); reader.onload=()=>setPreviews(old=>({...old,[id]:String(reader.result)})); reader.readAsDataURL(file);
+    edit(id,{});
+  }
+  function removePhoto(item:MenuItem){
+    const id=item.id;
+    setFiles(old=>{const next={...old}; delete next[id]; return next;});
+    setPreviews(old=>{const next={...old}; delete next[id]; return next;});
+    setRemovedPhotos(old=>({...old,[id]:item.image.startsWith("/api/menu/images/")}));
     edit(id,{});
   }
   return <main className="admin-shell menu-admin">
@@ -85,7 +95,7 @@ export default function MenuAdmin() {
     <div className="admin-toolbar"><button onClick={()=>void addDish()}>＋ Add a dish</button><button onClick={()=>void load()}>Refresh</button><input aria-label="Search menu" placeholder="Search dishes" value={query} onChange={e=>setQuery(e.target.value)}/><span>{loaded?`${filtered.length} of ${items.length} dishes`:"Loading menu…"}</span></div>
     {error&&<p className="admin-error" role="alert">{error}</p>}
     <div className="menu-editor-grid">{filtered.map(item=><article id={`menu-item-${item.id}`} className={`menu-editor-card ${!item.active?"menu-editor-inactive":""} ${focusId===item.id?"menu-editor-focus":""}`} key={item.id}>
-      <div className="menu-editor-image"><img src={previews[item.id]||item.image} alt={item.name}/><label>Change photo<input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>chooseImage(item.id,e.target.files?.[0])}/></label><small>JPEG, PNG or WebP · up to 100 MP / 100 MB. Large originals are optimized for the website.</small></div>
+      <div className="menu-editor-image"><img src={removedPhotos[item.id]?`/menu/${item.id}.jpg`:previews[item.id]||item.image} alt={item.name}/><div className="menu-editor-image-actions"><label>Change photo<input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>chooseImage(item.id,e.target.files?.[0])}/></label>{(files[item.id]||item.image.startsWith("/api/menu/images/")&&!removedPhotos[item.id])&&<button type="button" onClick={()=>removePhoto(item)}>Remove photo</button>}</div><small>JPEG, PNG or WebP · up to 100 MP / 100 MB. Large originals are optimized for the website.</small></div>
       <div className="menu-editor-fields">
         <label>Dish name (English)<input value={item.name} maxLength={100} onChange={e=>edit(item.id,{name:e.target.value})}/></label>
         <label>Dish name (Korean)<input value={item.ko} maxLength={100} onChange={e=>edit(item.id,{ko:e.target.value})}/></label>
