@@ -1,8 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import OwnerTabs from "./OwnerTabs";
-import { apiFetch } from "@/lib/client/api";
+import { apiFetch, demoAuthEnabled } from "@/lib/client/api";
 
 type Profile = { name: string; username: string; phone: string };
 
@@ -19,6 +20,7 @@ export default function OwnerMyPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    if (demoAuthEnabled) return;
     apiFetch("/api/admin/profile", { cache: "no-store" })
       .then(async (response) => {
         const data = await response.json();
@@ -84,6 +86,19 @@ export default function OwnerMyPage() {
       setBusy(false);
     }
   }
+
+  if (demoAuthEnabled)
+    return (
+      <main className="admin-shell">
+        <OwnerTabs />
+        <section>
+          <p className="eyebrow">DEMO ONLY</p>
+          <h1>Owner profile is not saved</h1>
+          <p>The public demo account has no private profile or changeable password. Owner profile and password updates need server-side storage.</p>
+          <Link className="button button-green" href="/admin/reservations">Return to the demo dashboard</Link>
+        </section>
+      </main>
+    );
 
   return (
     <main className="admin-shell">

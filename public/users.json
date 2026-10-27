@@ -1,0 +1,20 @@
+{
+  "demoOnly": true,
+  "notice": "These demonstration credentials are public and are not real accounts. Do not use real credentials or private information.",
+  "accounts": [
+    {
+      "username": "demo-owner",
+      "password": "demo-owner-public",
+      "kind": "owner",
+      "displayName": "Demo Owner",
+      "number": null
+    },
+    {
+      "username": "demo-guest",
+      "password": "demo-guest-public",
+      "kind": "guest",
+      "displayName": "Demo Guest",
+      "number": "DEMO"
+    }
+  ]
+}

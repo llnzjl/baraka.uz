@@ -1,16 +1,16 @@
-# GitHub Pages
+# GitHub Pages demo mode
 
-The `baraka` repository publishes the static public restaurant website at
-`https://llnzjl.github.io/baraka/`. The root URL `https://llnzjl.github.io/`
-is reserved for a separate repository named `llnzjl.github.io`.
+GitHub Pages serves the static restaurant site. On Pages, the existing sign-in screen uses `public/users.json` and browser `localStorage` for public demonstration accounts. Anyone can fetch the JSON file and read both usernames and passwords. This is demo-only sign-in; it does not securely authenticate or protect private data. The saved account is local to the browser and can be changed by its user.
 
-GitHub Pages serves static files. The Pages build publishes the restaurant home
-page, menu, contact details, and static assets. Server features such as owner
-sign-in, live reservations, order management, and menu editing require an
-application server and are unavailable on this Pages deployment. The reservation
-section directs visitors to call the restaurant instead of showing invented
-availability.
+Public demo accounts:
 
-The `Publish GitHub Pages` workflow deploys on every push to `main`. Check its
-run under the repository's **Actions** tab. After the first successful run,
-GitHub serves the site at the project URL above.
+| Role | Username | Password |
+| --- | --- | --- |
+| Owner demo | `demo-owner` | `demo-owner-public` |
+| Guest demo | `demo-guest` | `demo-guest-public` |
+
+Do not replace these with real credentials or put private customer, employee, or business data in the JSON file. The login fetches `users.json` from the deployed site and remembers only the selected demo username in `localStorage`.
+
+The owner and guest page layouts are demonstrations. Live reservations and cancellations, table ordering, guest profile edits, menu changes, owner profile/password changes, private record exports, and notifications need server-side storage and are not saved by demo sign-in. Online reservations on the static site direct visitors to contact the restaurant.
+
+The GitHub Actions workflow builds with the repository-specific Pages base path, exports the site to `out/`, and deploys the static files. Check the **Actions** tab for the **Publish GitHub Pages** workflow after pushing to `main`.

@@ -6,7 +6,13 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { configSchema, seoulDate, clock } from "@/lib/booking/validation";
 import BookingForm from "./BookingForm";
-import { apiFetch, downloadApiFile } from "@/lib/client/api";
+import {
+  apiFetch,
+  clearDemoSession,
+  demoAuthEnabled,
+  downloadApiFile,
+  saveApiSessionToken,
+} from "@/lib/client/api";
 type Config = z.infer<typeof configSchema>;
 type Reservation = {
   id: string;
@@ -248,15 +254,20 @@ export default function ReservationAdmin() {
             <button onClick={() => void settings()}>Hours & capacity</button>
           )}
           <button
-            onClick={() =>
+            onClick={() => {
+              if (demoAuthEnabled) {
+                clearDemoSession();
+                saveApiSessionToken(null);
+                window.location.assign(`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/`);
+                return;
+              }
               void apiFetch("/api/session", { method: "DELETE" }).then((r) => {
                 if (r.ok) {
-                  localStorage.removeItem("baraka-session-token");
+                  saveApiSessionToken(null);
                   window.location.assign(`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/`);
-                }
-                else setError("Sign out failed. Please retry.");
-              })
-            }
+                } else setError("Sign out failed. Please retry.");
+              });
+            }}
           >
             Sign out
           </button>

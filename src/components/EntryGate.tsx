@@ -9,13 +9,27 @@ import {
 } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { apiFetch, saveApiSessionToken, staticSiteOnly } from "@/lib/client/api";
-import { restaurant } from "@/data/restaurant";
+import {
+  apiFetch,
+  clearDemoSession,
+  demoAuthEnabled,
+  demoSessionStorageKey,
+  fetchDemoAccounts,
+  saveApiSessionToken,
+  saveDemoSession,
+} from "@/lib/client/api";
 type Session = {
   kind: "owner" | "guest";
   number: string | null;
   displayName: string;
 };
+function demoSession(account: { kind: "owner" | "guest"; number: string | null; displayName: string }): Session {
+  return {
+    kind: account.kind,
+    number: account.kind === "guest" ? account.number || "DEMO" : null,
+    displayName: account.displayName,
+  };
+}
 const SessionContext = createContext<{
   session: Session | null;
   setSession: (s: Session | null) => void;
@@ -28,7 +42,25 @@ export default function EntryGate({ children }: { children: ReactNode }) {
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   useEffect(() => {
-    if (staticSiteOnly) { setLoading(false); return; }
+    if (demoAuthEnabled) {
+      saveApiSessionToken(null);
+      let active = true;
+      const restore = async () => {
+        try {
+          const username = localStorage.getItem(demoSessionStorageKey);
+          if (!username) return;
+          const account = (await fetchDemoAccounts()).find((candidate) => candidate.username === username);
+          if (active && account) setSession(demoSession(account));
+          if (active && !account) clearDemoSession();
+        } catch {
+          if (active) setError("Demo login could not load the public users.json account list.");
+        } finally {
+          if (active) setLoading(false);
+        }
+      };
+      void restore();
+      return () => { active = false; };
+    }
     apiFetch("/api/session", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setSession(d.session || null))
@@ -36,7 +68,7 @@ export default function EntryGate({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
   useEffect(() => {
-    if (session?.kind !== "guest") return;
+    if (demoAuthEnabled || session?.kind !== "guest") return;
     let active = true;
     const refresh = async () => {
       try {
@@ -63,6 +95,27 @@ export default function EntryGate({ children }: { children: ReactNode }) {
     setBusy(true);
     setError("");
     try {
+      if (demoAuthEnabled) {
+        const accounts = await fetchDemoAccounts();
+        const username = String(f?.get("username") || "").trim();
+        const password = String(f?.get("password") || "");
+        const account = kind === "guest"
+          ? accounts.find((candidate) => candidate.kind === "guest")
+          : accounts.find((candidate) => candidate.kind === "owner" && candidate.username === username && candidate.password === password);
+        if (!account)
+          throw new Error("Demo sign-in failed. Use an account listed in the public users.json file.");
+        saveDemoSession(account.username);
+        saveApiSessionToken(null);
+        setSession(demoSession(account));
+        const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+        if (kind === "owner") window.location.assign(`${basePath}/admin/reservations/`);
+        else
+          window.location.assign(
+            `${basePath}/guest/profile/?next=` +
+              encodeURIComponent(path + window.location.search),
+          );
+        return;
+      }
       const r = await apiFetch("/api/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -102,6 +155,13 @@ export default function EntryGate({ children }: { children: ReactNode }) {
   async function logout() {
     setBusy(true);
     try {
+      if (demoAuthEnabled) {
+        clearDemoSession();
+        saveApiSessionToken(null);
+        setSession(null);
+        window.location.assign(`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/`);
+        return;
+      }
       const r = await apiFetch("/api/session", { method: "DELETE" });
       if (!r.ok) throw new Error();
       saveApiSessionToken(null);
@@ -111,20 +171,9 @@ export default function EntryGate({ children }: { children: ReactNode }) {
       setBusy(false);
     }
   }
-  if (staticSiteOnly) {
-    const protectedPage = path.startsWith("/admin") || path.startsWith("/guest") || path === "/order" || path === "/order/" || path.startsWith("/book-a-table");
-    if (!protectedPage)
-      return <SessionContext.Provider value={{ session: null, setSession }}>{children}</SessionContext.Provider>;
-    return (
-      <main className="entry-screen"><section className="entry-card">
-        <p className="eyebrow">BARAKA</p>
-        <h1>{path.startsWith("/admin") ? "Owner sign-in is not available online yet" : "Please contact the restaurant"}</h1>
-        <p>Online reservations and ordering are not available yet. You can still browse our menu and contact us directly.</p>
-        <p><a href={restaurant.phoneHref}>{restaurant.phone}</a></p>
-        <Link className="button button-green" href="/">Browse the restaurant</Link>
-      </section></main>
-    );
-  }
+  const protectedPage = path.startsWith("/admin") || path.startsWith("/guest") || path === "/order" || path === "/order/";
+  if (demoAuthEnabled && !protectedPage)
+    return <SessionContext.Provider value={{ session, setSession }}>{children}</SessionContext.Provider>;
   if (loading)
     return (
       <main className="entry-screen">
@@ -157,6 +206,12 @@ export default function EntryGate({ children }: { children: ReactNode }) {
           </button>
           <span role="alert">{error}</span>
         </div>
+        {demoAuthEnabled && (
+          <aside className="demo-only-notice" role="note">
+            <strong>DEMO ONLY — PUBLIC LOGIN</strong>
+            <span>This account does not securely protect or save reservations, orders, menu edits, profiles, or private records.</span>
+          </aside>
+        )}
         {children}
       </SessionContext.Provider>
     );
@@ -167,8 +222,9 @@ export default function EntryGate({ children }: { children: ReactNode }) {
         <h1>Welcome to our table</h1>
         <p>환영합니다 · Welcome · Xush kelibsiz · Добро пожаловать</p>
         <p>
-          Continue as a guest to explore the restaurant and reserve a table.
-          Your guest number is created automatically.
+          {demoAuthEnabled
+            ? "Continue with a public guest demo account. Demo sign-in is not private or secure."
+            : "Continue as a guest to explore the restaurant and reserve a table. Your guest number is created automatically."}
         </p>
         {!path.startsWith("/admin") && (
           <button
@@ -180,7 +236,7 @@ export default function EntryGate({ children }: { children: ReactNode }) {
           </button>
         )}
         <form className="admin-login" onSubmit={(e) => login("owner", e)}>
-          <h2>Owner sign-in</h2>
+          <h2>{demoAuthEnabled ? "Owner demo sign-in" : "Owner sign-in"}</h2>
           <label>
             Username
             <input
@@ -204,10 +260,15 @@ export default function EntryGate({ children }: { children: ReactNode }) {
             {busy ? "Please wait…" : "Sign in as owner"}
           </button>
         </form>
+        {demoAuthEnabled && (
+          <p className="demo-login-note" role="note">
+            Demo only: these usernames and passwords are public. <a href={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/users.json`}>View users.json</a>. Never enter real credentials or private information.
+          </p>
+        )}
         <p role="alert">{error}</p>
-        <small>
-          Reserve online at any time, even when the owner is offline.
-        </small>
+        <small>{demoAuthEnabled
+          ? "Live bookings, orders, and dashboard changes need server-side storage and are not saved by this demo."
+          : "Reserve online at any time, even when the owner is offline."}</small>
       </section>
     </main>
   );

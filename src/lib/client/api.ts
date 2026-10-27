@@ -1,7 +1,61 @@
 const pagesMode = process.env.NEXT_PUBLIC_GITHUB_PAGES === "true";
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
+export const demoAuthEnabled = pagesMode;
 export const staticSiteOnly = pagesMode && !apiBaseUrl;
 const tokenKey = "baraka-session-token";
+export const demoSessionStorageKey = "baraka-demo-account";
+
+export type DemoAccount = {
+  username: string;
+  password: string;
+  kind: "owner" | "guest";
+  displayName: string;
+  number: string | null;
+};
+
+function isDemoAccount(value: unknown): value is DemoAccount {
+  if (!value || typeof value !== "object") return false;
+  const account = value as Partial<DemoAccount>;
+  return (
+    typeof account.username === "string" &&
+    typeof account.password === "string" &&
+    (account.kind === "owner" || account.kind === "guest") &&
+    typeof account.displayName === "string" &&
+    (account.number === null || typeof account.number === "string")
+  );
+}
+
+export async function fetchDemoAccounts(): Promise<DemoAccount[]> {
+  const basePath = (process.env.NEXT_PUBLIC_BASE_PATH || "").replace(/\/$/, "");
+  const response = await fetch(`${basePath}/users.json`, { cache: "no-store" });
+  if (!response.ok) throw new Error("The public demo account file could not be loaded.");
+  const data: unknown = await response.json();
+  if (
+    !data ||
+    typeof data !== "object" ||
+    !Array.isArray((data as { accounts?: unknown }).accounts) ||
+    !(data as { accounts: unknown[] }).accounts.every(isDemoAccount)
+  ) {
+    throw new Error("The public demo account file has an invalid format.");
+  }
+  return (data as { accounts: DemoAccount[] }).accounts;
+}
+
+export function saveDemoSession(username: string) {
+  try {
+    localStorage.setItem(demoSessionStorageKey, username);
+  } catch {
+    throw new Error("Demo login needs browser local storage to remember this account.");
+  }
+}
+
+export function clearDemoSession() {
+  try {
+    localStorage.removeItem(demoSessionStorageKey);
+  } catch {
+    // The next page load still requires the public demo account file.
+  }
+}
 
 export function saveApiSessionToken(token: string | null) {
   try {

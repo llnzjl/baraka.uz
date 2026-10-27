@@ -1,6 +1,6 @@
 ﻿"use client";
 import BookingForm from "./BookingForm";
-import { staticSiteOnly } from "@/lib/client/api";
+import { demoAuthEnabled, staticSiteOnly } from "@/lib/client/api";
 import { restaurant } from "@/data/restaurant";
 export default function ReservationForm({
   language = "ko",
@@ -10,7 +10,7 @@ export default function ReservationForm({
   phone?: string;
   instagramUrl?: string;
 }) {
-  if (staticSiteOnly) return (
+  if (demoAuthEnabled || staticSiteOnly) return (
     <div className="booking-form">
       <p>{language === "ko" ? "온라인 예약은 아직 준비 중입니다. 예약 및 주문은 전화로 문의해 주세요." : "Online reservations are not available yet. Please call us for reservations and orders."}</p>
       <a className="button button-green" href={restaurant.phoneHref}>{phone}</a>

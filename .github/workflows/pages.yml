@@ -40,8 +40,11 @@ jobs:
       - name: Report backend configuration status
         shell: bash
         run: |
-          if [[ -z "$NEXT_PUBLIC_API_BASE_URL" || -z "$NEXT_PUBLIC_TURNSTILE_SITE_KEY" ]]; then
-            echo "::warning::Deno Deploy API URL or Turnstile public site key is missing. The site publishes, but sign-in, reservations and ordering remain unavailable until configured."
+          if [[ -z "$NEXT_PUBLIC_API_BASE_URL" ]]; then
+            echo "::warning::No live API is configured. Public demo sign-in still works; live reservations, orders, owner data, and menu management are unavailable."
+          fi
+          if [[ -n "$NEXT_PUBLIC_API_BASE_URL" && -z "$NEXT_PUBLIC_TURNSTILE_SITE_KEY" ]]; then
+            echo "::warning::Turnstile site key is missing. Public demo sign-in works, but protected online reservation requests cannot pass bot verification."
           fi
       - name: Prepare the static public site
         shell: bash

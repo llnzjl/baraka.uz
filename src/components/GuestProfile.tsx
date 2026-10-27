@@ -2,13 +2,24 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useEntrySession } from "./EntryGate";
-import { apiFetch } from "@/lib/client/api";
+import { apiFetch, demoAuthEnabled } from "@/lib/client/api";
 
 export default function GuestProfile() {
   const { session, setSession } = useEntrySession();
   const [name, setName] = useState(session?.displayName || ""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  if (demoAuthEnabled)
+    return (
+      <main className="entry-screen">
+        <section className="entry-card">
+          <p className="eyebrow">DEMO ONLY</p>
+          <h1>Guest profiles are not saved</h1>
+          <p>This public demo login stores only the demo account name in this browser. Editing a real guest profile requires server-side storage.</p>
+          <Link className="button button-green" href="/">Return to the restaurant</Link>
+        </section>
+      </main>
+    );
   if (session?.kind !== "guest")
     return (
       <main className="entry-screen">

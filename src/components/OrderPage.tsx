@@ -3,7 +3,7 @@ import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useEntrySession } from "./EntryGate";
 import type { DiningOrder } from "@/lib/orders/validation";
-import { apiFetch } from "@/lib/client/api";
+import { apiFetch, demoAuthEnabled } from "@/lib/client/api";
 type Menu = {
   id: string;
   name: string;
@@ -89,7 +89,7 @@ export default function OrderPage() {
     }
   }, []);
   useEffect(() => {
-    if (session?.kind !== "guest") return;
+    if (demoAuthEnabled || session?.kind !== "guest") return;
     void loadCatalog();
     void refresh();
     const timer = setInterval(() => {
@@ -97,6 +97,14 @@ export default function OrderPage() {
     }, 5000);
     return () => clearInterval(timer);
   }, [session?.kind, loadCatalog, refresh]);
+  if (demoAuthEnabled)
+    return (
+      <main className="order-shell">
+        <h1>Table ordering is not enabled in demo mode</h1>
+        <p>Submitting and tracking orders requires server-side storage. This public demo account does not create or save orders.</p>
+        <Link href="/">Return to the restaurant</Link>
+      </main>
+    );
   if (session?.kind !== "guest")
     return (
       <main className="order-shell">
