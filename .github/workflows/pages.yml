@@ -20,7 +20,7 @@ jobs:
     env:
       GITHUB_PAGES: "true"
       NEXT_PUBLIC_GITHUB_PAGES: "true"
-      NEXT_PUBLIC_BASE_PATH: /baraka
+      NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
       NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
     steps:
@@ -52,8 +52,6 @@ jobs:
         run: npm run build
       - name: Configure Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
         with:

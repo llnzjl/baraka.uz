@@ -10,7 +10,7 @@ import { restaurant } from "@/data/restaurant";
 export const metadata: Metadata = {
   title: "BARAKA · Uzbek Kitchen in Cheongju | 우즈벡할랄식당",
   description: "A taste of Uzbekistan in Cheongju. Explore the menu, meet Chef Asr, and find 우즈벡할랄식당 at 178 Sinyul-ro, Bokdae-dong. Call 043-268-8329.",
-  icons: { icon: "/brand-icon.svg", apple: "/brand-icon.svg" },
+  icons: { icon: `${process.env.NEXT_PUBLIC_BASE_PATH || ""}/brand-icon.svg`, apple: `${process.env.NEXT_PUBLIC_BASE_PATH || ""}/brand-icon.svg` },
   openGraph: {
     title: "BARAKA · A Taste of Uzbekistan, in the Heart of Korea.",
     description: "Good food. A warm welcome. Explore our Uzbek kitchen and meet Chef Asr.",

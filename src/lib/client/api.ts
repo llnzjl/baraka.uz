@@ -1,5 +1,6 @@
 const pagesMode = process.env.NEXT_PUBLIC_GITHUB_PAGES === "true";
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
+export const staticSiteOnly = pagesMode && !apiBaseUrl;
 const tokenKey = "baraka-session-token";
 
 export function saveApiSessionToken(token: string | null) {

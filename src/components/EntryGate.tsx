@@ -9,7 +9,8 @@ import {
 } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { apiFetch, saveApiSessionToken } from "@/lib/client/api";
+import { apiFetch, saveApiSessionToken, staticSiteOnly } from "@/lib/client/api";
+import { restaurant } from "@/data/restaurant";
 type Session = {
   kind: "owner" | "guest";
   number: string | null;
@@ -27,6 +28,7 @@ export default function EntryGate({ children }: { children: ReactNode }) {
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   useEffect(() => {
+    if (staticSiteOnly) { setLoading(false); return; }
     apiFetch("/api/session", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setSession(d.session || null))
@@ -108,6 +110,20 @@ export default function EntryGate({ children }: { children: ReactNode }) {
       setError("Could not sign out. Please retry.");
       setBusy(false);
     }
+  }
+  if (staticSiteOnly) {
+    const protectedPage = path.startsWith("/admin") || path.startsWith("/guest") || path === "/order" || path === "/order/" || path.startsWith("/book-a-table");
+    if (!protectedPage)
+      return <SessionContext.Provider value={{ session: null, setSession }}>{children}</SessionContext.Provider>;
+    return (
+      <main className="entry-screen"><section className="entry-card">
+        <p className="eyebrow">BARAKA</p>
+        <h1>{path.startsWith("/admin") ? "Owner sign-in is not available online yet" : "Please contact the restaurant"}</h1>
+        <p>Online reservations and ordering are not available yet. You can still browse our menu and contact us directly.</p>
+        <p><a href={restaurant.phoneHref}>{restaurant.phone}</a></p>
+        <Link className="button button-green" href="/">Browse the restaurant</Link>
+      </section></main>
+    );
   }
   if (loading)
     return (

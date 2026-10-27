@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight, ArrowRight, ArrowDown, Check, ChevronDown, Copy, Instagram, MapPin, Menu, Phone, Search, X, Clock, Utensils, Camera } from "./SiteIcons";
 import ReservationForm from "./ReservationForm";
 import SilkRoadSections from "./SilkRoadSections";
-import { apiFetch, apiUrl } from "@/lib/client/api";
+import { apiFetch, apiUrl, staticSiteOnly } from "@/lib/client/api";
 import { restaurant } from "@/data/restaurant";
 import { menuItems, type MenuItem, type Category } from "@/data/menu";
 
@@ -70,6 +70,7 @@ export default function RestaurantSite({ menuPhotos = {} }: Props) {
     return () => { if (copyTimer.current) clearTimeout(copyTimer.current); };
   }, []);
   useEffect(() => {
+    if (staticSiteOnly) return;
     let alive = true;
     const refresh = async () => {
       try {
