@@ -1,4 +1,7 @@
 "use client";
+import LanguageSwitcher, { useSiteLanguage } from "./SiteLanguage";
+import { languageLocales } from "@/lib/site-language";
+import { localizedDish, dishSearchText } from "@/data/menu-translations";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useEntrySession } from "./EntryGate";
@@ -20,8 +23,8 @@ type Catalog = {
 };
 export default function OrderPage() {
   const { session } = useEntrySession();
-  const [lang, setLang] = useState<"en" | "ko">("ko"),
-    [catalog, setCatalog] = useState<Catalog | null>(null),
+  const { language: lang, t } = useSiteLanguage();
+  const [catalog, setCatalog] = useState<Catalog | null>(null),
     [table, setTable] = useState(""),
     [cart, setCart] = useState<Record<string, number>>({}),
     [category, setCategory] = useState("all"),
@@ -47,19 +50,12 @@ export default function OrderPage() {
   }, [receipt]);
   const pending = useRef<{ fingerprint: string; key: string } | null>(null),
     refreshId = useRef(0);
-  const t = (en: string, ko: string) => (lang === "ko" ? ko : en);
   const money = (n: number) =>
-    new Intl.NumberFormat(lang === "ko" ? "ko-KR" : "en-US", {
+    new Intl.NumberFormat(languageLocales[lang], {
       style: "currency",
       currency: "KRW",
       maximumFractionDigits: 0,
     }).format(n);
-  useEffect(() => {
-    try {
-      const l = localStorage.getItem("baraka-language");
-      if (l === "en" || l === "ko") setLang(l);
-    } catch {}
-  }, []);
   const loadCatalog = useCallback(async () => {
     try {
       const r = await apiFetch("/api/orders/catalog", { cache: "no-store" });
@@ -70,7 +66,7 @@ export default function OrderPage() {
       setCart(current => Object.fromEntries(Object.entries(current).filter(([id]) => activeIds.has(id))));
     } catch {
       setError(
-        "Unable to load ordering. Please refresh or ask a member of staff. / 주문 메뉴를 불러올 수 없습니다. 직원에게 문의해 주세요.",
+        "Unable to load ordering. Please refresh or ask a member of staff.",
       );
     }
   }, []);
@@ -100,17 +96,19 @@ export default function OrderPage() {
   if (demoAuthEnabled)
     return (
       <main className="order-shell">
-        <h1>Table ordering is not enabled in demo mode</h1>
-        <p>Submitting and tracking orders requires server-side storage. This public demo account does not create or save orders.</p>
-        <Link href="/">Return to the restaurant</Link>
+        <LanguageSwitcher />
+        <h1>{t("Table ordering is not enabled in demo mode")}</h1>
+        <p>{t("Submitting and tracking orders requires server-side storage. This public demo account does not create or save orders.")}</p>
+        <Link href="/">{t("Return to the restaurant")}</Link>
       </main>
     );
   if (session?.kind !== "guest")
     return (
       <main className="order-shell">
-        <h1>Order at your table</h1>
-        <p>Continue as a guest to place an order.</p>
-        <Link href="/">Return to the restaurant</Link>
+        <LanguageSwitcher />
+        <h1>{t("Order at your table")}</h1>
+        <p>{t("Continue as a guest to place an order.")}</p>
+        <Link href="/">{t("Return to the restaurant")}</Link>
       </main>
     );
   const selected = catalog?.tables.find((x) => x.id === table);
@@ -239,7 +237,7 @@ export default function OrderPage() {
           <Link className="text-link" href="/">
             ← {t("Restaurant", "레스토랑")}
           </Link>
-          <p className="eyebrow">BARAKA · AT YOUR TABLE</p>
+          <p className="eyebrow">{t("BARAKA · AT YOUR TABLE")}</p>
           <h1>
             {t("Something delicious,", "맛있는 한 끼,")}
             <br />
@@ -250,16 +248,7 @@ export default function OrderPage() {
             · {t("Guest", "비회원")} {session.number}
           </p>
         </div>
-        <label className="order-language">
-          {t("Language", "언어")}
-          <select
-            value={lang}
-            onChange={(e) => setLang(e.target.value as "en" | "ko")}
-          >
-            <option value="ko">한국어</option>
-            <option value="en">English</option>
-          </select>
-        </label>
+        <LanguageSwitcher />
       </div>
       {!catalog ? (
         <p role="status">
@@ -290,7 +279,7 @@ export default function OrderPage() {
                   }}
                 >
                   <strong>{x.name}</strong>
-                  <small>{t(`Up to ${x.seats} seats`, `${x.seats}인석`)}</small>
+                  <small>{t("Up to {count} seats", "{count}인석").replace("{count}", String(x.seats))}</small>
                 </button>
               ))}
             </div>
@@ -346,16 +335,15 @@ export default function OrderPage() {
                     .filter(
                       (i) =>
                         (category === "all" || i.category === category) &&
-                        `${i.name} ${i.ko}`
-                          .toLowerCase()
+                        dishSearchText(i)
                           .includes(query.toLowerCase()),
                     )
                     .map((i) => (
                       <article className="order-dish" key={i.id}>
                         <div>
                           <small>{t(i.ko, i.name)}</small>
-                          <h3>{t(i.name, i.ko)}</h3>
-                          <p>{t(i.description, i.descriptionKo)}</p>
+                          <h3>{localizedDish(i, lang).name}</h3>
+                          <p>{localizedDish(i, lang).description}</p>
                           <strong>
                             {i.price === null
                               ? t("Ask staff for price", "가격 문의")
@@ -365,18 +353,18 @@ export default function OrderPage() {
                         <div className="order-quantity">
                           <button
                             type="button"
-                            aria-label={`${t("Remove", "빼기")} ${t(i.name, i.ko)}`}
+                            aria-label={`${t("Remove", "빼기")} ${localizedDish(i, lang).name}`}
                             disabled={busy || !cart[i.id]}
                             onClick={() => change(i.id, -1)}
                           >
                             −
                           </button>
-                          <output aria-label={`${t(i.name, i.ko)} quantity`}>
+                          <output aria-label={`${localizedDish(i, lang).name} ${t("Quantity", "수량")}`}>
                             {cart[i.id] || 0}
                           </output>
                           <button
                             type="button"
-                            aria-label={`${t("Add", "추가")} ${t(i.name, i.ko)}`}
+                            aria-label={`${t("Add", "추가")} ${localizedDish(i, lang).name}`}
                             disabled={
                               busy ||
                               (cart[i.id] || 0) >= 20 ||
@@ -406,7 +394,7 @@ export default function OrderPage() {
                       {lines.map((i) => (
                         <li key={i.id}>
                           <span>
-                            {cart[i.id]} × {t(i.name, i.ko)}
+                            {cart[i.id]} × {localizedDish(i, lang).name}
                           </span>
                           <strong>
                             {i.price === null
@@ -446,7 +434,7 @@ export default function OrderPage() {
         </>
       )}
       <p className="order-error" role="alert">
-        {error}
+        {t(error, error === "Unable to load ordering. Please refresh or ask a member of staff." ? "주문 메뉴를 불러올 수 없습니다. 직원에게 문의해 주세요." : error)}
       </p>
       {error && !catalog && (
         <button onClick={() => void loadCatalog()}>
@@ -462,9 +450,9 @@ export default function OrderPage() {
         >
           <h2>
             {t(
-              `Order #${receipt.queue_number} received`,
-              `주문 #${receipt.queue_number} 접수 완료`,
-            )}
+              "Order #{number} received",
+              "주문 #{number} 접수 완료",
+            ).replace("{number}", receipt.queue_number)}
           </h2>
           <p>
             {receipt.table_name} ·{" "}
@@ -496,13 +484,13 @@ export default function OrderPage() {
               </div>
               <time dateTime={o.created_at}>
                 {new Date(o.created_at).toLocaleString(
-                  lang === "ko" ? "ko-KR" : "en-GB",
+                  languageLocales[lang],
                   { timeZone: "Asia/Seoul", hour12: false },
                 )}
               </time>
               <p>
                 {o.items
-                  .map((i) => `${i.quantity} × ${t(i.name, i.nameKo)}`)
+                  .map((i) => `${i.quantity} × ${localizedDish({ id: i.menuId, name: i.name, ko: i.nameKo, description: "", descriptionKo: "" }, lang).name}`)
                   .join(" · ")}
               </p>
             </article>

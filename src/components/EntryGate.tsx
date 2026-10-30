@@ -7,6 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import LanguageSwitcher, { useSiteLanguage } from "./SiteLanguage";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -37,6 +38,7 @@ const SessionContext = createContext<{
 export const useEntrySession = () => useContext(SessionContext);
 export default function EntryGate({ children }: { children: ReactNode }) {
   const path = usePathname();
+  const { t } = useSiteLanguage();
   const [session, setSession] = useState<Session | null>(null),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
@@ -177,39 +179,39 @@ export default function EntryGate({ children }: { children: ReactNode }) {
   if (loading)
     return (
       <main className="entry-screen">
-        <p role="status">BARAKA · Loading…</p>
+        <p role="status">BARAKA · {t("Loading…", "불러오는 중…")}</p>
       </main>
     );
   if (session && (!path.startsWith("/admin") || session.kind === "owner"))
     return (
       <SessionContext.Provider value={{ session, setSession }}>
         <div className="session-bar">
+          <LanguageSwitcher />
           <span>
             {session.displayName ||
-              (session.kind === "owner" ? "Owner" : `Guest ${session.number}`)}
+              (session.kind === "owner" ? t("Owner") : `Guest ${session.number}`)}
           </span>
           {session.kind === "guest" && (
             <>
-              <Link href="/guest/profile">Edit name</Link>
-              <Link href="/order">Order now</Link>
+              <Link href="/guest/profile">{t("Edit name")}</Link>
+              <Link href="/order">{t("Order now")}</Link>
             </>
           )}
           {session.kind === "owner" && (
             <>
-              <Link href="/admin/reservations">Reservations</Link>
-              <Link href="/admin/orders">Orders</Link>
-              <Link href="/admin/my-page">My Page</Link>
+              <Link href="/admin/reservations">{t("Reservations")}</Link>
+              <Link href="/admin/orders">{t("Orders")}</Link>
+              <Link href="/admin/my-page">{t("My Page")}</Link>
             </>
           )}
           <button disabled={busy} onClick={logout}>
-            Sign out
-          </button>
-          <span role="alert">{error}</span>
+            {t("Sign out")}</button>
+          <span role="alert">{t(error)}</span>
         </div>
         {demoAuthEnabled && (
           <aside className="demo-only-notice" role="note">
-            <strong>DEMO ONLY — PUBLIC LOGIN</strong>
-            <span>This account does not securely protect or save reservations, orders, menu edits, profiles, or private records.</span>
+            <strong>{t("DEMO ONLY — PUBLIC LOGIN")}</strong>
+            <span>{t("This account does not securely protect or save reservations, orders, menu edits, profiles, or private records.")}</span>
           </aside>
         )}
         {children}
@@ -218,13 +220,14 @@ export default function EntryGate({ children }: { children: ReactNode }) {
   return (
     <main className="entry-screen">
       <section className="entry-card">
+        <LanguageSwitcher />
         <p className="eyebrow">BARAKA · SILK ROAD DINING</p>
-        <h1>Welcome to our table</h1>
+        <h1>{t("Welcome to our table")}</h1>
         <p>환영합니다 · Welcome · Xush kelibsiz · Добро пожаловать</p>
         <p>
           {demoAuthEnabled
-            ? "Continue with a public guest demo account. Demo sign-in is not private or secure."
-            : "Continue as a guest to explore the restaurant and reserve a table. Your guest number is created automatically."}
+            ? t("Continue with a public guest demo account. Demo sign-in is not private or secure.")
+            : t("Continue as a guest to explore the restaurant and reserve a table. Your guest number is created automatically.")}
         </p>
         {!path.startsWith("/admin") && (
           <button
@@ -232,14 +235,13 @@ export default function EntryGate({ children }: { children: ReactNode }) {
             disabled={busy}
             onClick={() => login("guest")}
           >
-            Continue as guest · 비회원 입장
+            {t("Continue as guest", "비회원 입장")}
           </button>
         )}
         <form className="admin-login" onSubmit={(e) => login("owner", e)}>
-          <h2>{demoAuthEnabled ? "Owner demo sign-in" : "Owner sign-in"}</h2>
+          <h2>{demoAuthEnabled ? t("Owner demo sign-in") : t("Owner sign-in")}</h2>
           <label>
-            Username
-            <input
+            {t("Username")}<input
               name="username"
               autoComplete="username"
               maxLength={100}
@@ -247,8 +249,7 @@ export default function EntryGate({ children }: { children: ReactNode }) {
             />
           </label>
           <label>
-            Password
-            <input
+            {t("Password")}<input
               name="password"
               type="password"
               autoComplete="current-password"
@@ -257,18 +258,18 @@ export default function EntryGate({ children }: { children: ReactNode }) {
             />
           </label>
           <button disabled={busy}>
-            {busy ? "Please wait…" : "Sign in as owner"}
+            {busy ? t("Please wait…") : t("Sign in as owner")}
           </button>
         </form>
         {demoAuthEnabled && (
           <p className="demo-login-note" role="note">
-            Demo only: these usernames and passwords are public. <a href={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/users.json`}>View users.json</a>. Never enter real credentials or private information.
+            {t("Demo only: these usernames and passwords are public.")} <a href={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/users.json`}>{t("View users.json")}</a>. {t("Never enter real credentials or private information.")}
           </p>
         )}
-        <p role="alert">{error}</p>
+        <p role="alert">{t(error)}</p>
         <small>{demoAuthEnabled
-          ? "Live bookings, orders, and dashboard changes need server-side storage and are not saved by this demo."
-          : "Reserve online at any time, even when the owner is offline."}</small>
+          ? t("Live bookings, orders, and dashboard changes need server-side storage and are not saved by this demo.")
+          : t("Reserve online at any time, even when the owner is offline.")}</small>
       </section>
     </main>
   );

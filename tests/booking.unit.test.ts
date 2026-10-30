@@ -13,7 +13,7 @@ import {
   seoulDate,
 } from "../src/lib/booking/validation";
 const now = new Date("2027-01-01T00:00:00Z");
-test("local origin normalization accepts the exact loopback Host without weakening configured origins", () => {
+test("local origin normalization accepts the exact loopback or LAN Host without weakening configured origins", () => {
   const previousMode = process.env.NODE_ENV;
   const previousOrigin = process.env.APP_ORIGIN;
   const env = process.env as Record<string, string | undefined>;
@@ -26,18 +26,23 @@ test("local origin normalization accepts the exact loopback Host without weakeni
     assert.doesNotThrow(() => origin(request("http://127.0.0.1:3000")));
     assert.doesNotThrow(() => origin(request("http://localhost:3000", "localhost:3000")));
     assert.doesNotThrow(() => origin(request("http://[::1]:3000", "[::1]:3000")));
+    assert.doesNotThrow(() => origin(request("http://172.30.69.137:3001", "172.30.69.137:3001")));
+    assert.doesNotThrow(() => origin(request("http://127.0.0.1:3001", "127.0.0.1:3001")));
     for (const candidate of [request(), request("null"), request("https://evil.example"),
-      request("http://127.0.0.1:3001", "127.0.0.1:3001"), request("http://127.0.0.1:3000", "localhost:3000"),
+      request("http://127.0.0.1:3001", "127.0.0.1:3000"), request("http://127.0.0.1:3000", "localhost:3000"),
+      request("http://172.30.69.137:3001", "172.30.69.138:3001"),
       request("https://127.0.0.1:3000"), request("http://127.0.0.1:3000/path")]) {
       assert.throws(() => origin(candidate), /FORBIDDEN/);
     }
     env.APP_ORIGIN = "http://localhost:3000";
     assert.throws(() => origin(request("http://127.0.0.1:3000")), /FORBIDDEN/);
+    assert.throws(() => origin(request("http://172.30.69.137:3001", "172.30.69.137:3001")), /FORBIDDEN/);
     env.NODE_ENV = "production";
     assert.doesNotThrow(() => origin(request("http://localhost:3000", "localhost:3000")));
     assert.throws(() => origin(request("http://127.0.0.1:3000")), /FORBIDDEN/);
     delete env.APP_ORIGIN;
     assert.throws(() => origin(request("http://127.0.0.1:3000")), /UNAVAILABLE/);
+    assert.throws(() => origin(request("http://172.30.69.137:3001", "172.30.69.137:3001")), /UNAVAILABLE/);
   } finally {
     if (previousMode === undefined) delete env.NODE_ENV; else env.NODE_ENV = previousMode;
     if (previousOrigin === undefined) delete env.APP_ORIGIN; else env.APP_ORIGIN = previousOrigin;

@@ -7,6 +7,7 @@ import { bookingCopy } from "@/lib/booking/copy";
 import { bookingSchema, Locale, seoulDate } from "@/lib/booking/validation";
 import styles from "./ReservationForm.module.css";
 import { apiFetch } from "@/lib/client/api";
+import { useSiteLanguage } from "./SiteLanguage";
 type Availability = {
   slots: string[];
   enabled: boolean;
@@ -98,7 +99,7 @@ function Challenge({
   );
 }
 export default function BookingForm({
-  initialLocale = "ko",
+  initialLocale,
   adminMode,
   onBooked,
 }: {
@@ -107,7 +108,8 @@ export default function BookingForm({
   onBooked?: () => void;
 }) {
   const { session } = useEntrySession();
-  const [locale, setLocale] = useState<Locale>(initialLocale),
+  const { language, changeLanguage } = useSiteLanguage();
+  const [locale, setLocale] = useState<Locale>(initialLocale ?? language),
     [date, setDate] = useState(""),
     [guests, setGuests] = useState(2),
     [time, setTime] = useState(""),
@@ -207,7 +209,7 @@ export default function BookingForm({
               : time && !timeAvailable
                 ? t.conflict
                 : help.choose;
-  useEffect(() => setLocale(initialLocale), [initialLocale]);
+  useEffect(() => setLocale(initialLocale ?? language), [initialLocale, language]);
   useEffect(() => {
     setDate(seoulDate());
     setToday(seoulDate());
@@ -332,7 +334,11 @@ export default function BookingForm({
         {t.language}
         <select
           value={locale}
-          onChange={(e) => setLocale(e.target.value as Locale)}
+          onChange={(e) => {
+            const next = e.target.value as Locale;
+            setLocale(next);
+            if (!adminMode) changeLanguage(next);
+          }}
         >
           <option value="ko">한국어</option>
           <option value="en">English</option>

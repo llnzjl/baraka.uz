@@ -11,7 +11,9 @@ import { apiFetch, apiUrl, staticSiteOnly } from "@/lib/client/api";
 import { restaurant } from "@/data/restaurant";
 import { menuItems, type MenuItem, type Category } from "@/data/menu";
 
-type Language = "en" | "ko";
+import LanguageSwitcher, { useSiteLanguage } from "./SiteLanguage";
+import { translate, type Language } from "@/lib/site-language";
+import { localizedDish, dishSearchText } from "@/data/menu-translations";
 type Props = { menuPhotos?: Record<string, string> };
 const publicAsset = (source: string) => {
   const prefix = process.env.NEXT_PUBLIC_BASE_PATH || "";
@@ -35,19 +37,20 @@ function Ornament({ className = "" }: { className?: string }) {
 
 function DishPhoto({ item, path, language }: { item: MenuItem; path?: string; language: Language }) {
   const [failed, setFailed] = useState(false);
+  const category = categories.find(candidate => candidate.id === item.category);
   useEffect(() => setFailed(false), [path]);
   return <div className={`dish-photo dish-photo--${item.category}`}>
-    {path && !failed ? <Image src={imageSource(path)} alt={language === "ko" ? item.ko : item.name} fill sizes="(max-width: 640px) 90vw, (max-width: 1000px) 45vw, 30vw" onError={() => setFailed(true)} /> : <>
+    {path && !failed ? <Image src={imageSource(path)} alt={localizedDish(item, language).name} fill sizes="(max-width: 640px) 90vw, (max-width: 1000px) 45vw, 30vw" onError={() => setFailed(true)} /> : <>
       <div className="plate-art" aria-hidden="true"><span /><Utensils size={34} /></div>
-      <span className="photo-soon"><Camera size={13} />{language === "ko" ? "사진 준비 중" : "A photo is on its way"}</span>
+      <span className="photo-soon"><Camera size={13} />{translate(language, "A photo is on its way", "사진 준비 중")}</span>
     </>}
-    <span className="dish-category">{categories.find(category => category.id === item.category)?.[language]}</span>
+    <span className="dish-category">{category ? translate(language, category.en, category.ko) : ""}</span>
   </div>;
 }
 
 export default function RestaurantSite({ menuPhotos = {} }: Props) {
   const {session}=useEntrySession();
-  const [language, setLanguage] = useState<Language>("ko");
+  const { language, t } = useSiteLanguage();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("");
   const [category, setCategory] = useState<Category>("all");
@@ -63,10 +66,8 @@ export default function RestaurantSite({ menuPhotos = {} }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const mobileToggleRef = useRef<HTMLButtonElement>(null);
   const copyTimer = useRef<ReturnType<typeof setTimeout>>();
-  const t = (en: string, ko: string) => language === "ko" ? ko : en;
 
   useEffect(() => {
-    try { const stored = localStorage.getItem("baraka-language"); if (stored === "ko" || stored === "en") setLanguage(stored); } catch { /* Storage is optional. */ }
     return () => { if (copyTimer.current) clearTimeout(copyTimer.current); };
   }, []);
   useEffect(() => {
@@ -92,7 +93,6 @@ export default function RestaurantSite({ menuPhotos = {} }: Props) {
     const timer = setInterval(() => { if (!document.hidden) void refresh(); }, 5000);
     return () => { alive = false; clearInterval(timer); };
   }, [menuPhotos]);
-  useEffect(() => { document.documentElement.lang = language; }, [language]);
   useEffect(() => {
     const observer = new IntersectionObserver(entries => {
       entries.forEach(entry => { if (entry.isIntersecting) setActiveSection(entry.target.id); });
@@ -113,16 +113,12 @@ export default function RestaurantSite({ menuPhotos = {} }: Props) {
 
   const filteredMenu = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
-    return menu.filter(item => (category === "all" || item.category === category) && `${item.name} ${item.ko} ${item.description} ${item.descriptionKo}`.toLocaleLowerCase().includes(normalized));
+    return menu.filter(item => (category === "all" || item.category === category) && dishSearchText(item).includes(normalized));
   }, [category, query, menu]);
   const featuredIds = ["plov", "lamb-shashlik", "manti", "samsa", "chuchvara", "shakarop"];
   const visibleMenu = expanded || query.trim() || category !== "all" ? filteredMenu : featuredIds.flatMap(id => menu.filter(item => item.id === id));
   const nav = [ { id: "menu", label: t("The menu", "메뉴") }, { id: "story", label: t("Our story", "우리의 이야기") }, { id: "gallery", label: t("The experience", "갤러리") }, { id: "halal", label: t("Halal", "할랄 안내") }, { id: "visit", label: t("Find us", "오시는 길") } ];
 
-  function changeLanguage(next: Language) {
-    setLanguage(next);
-    try { localStorage.setItem("baraka-language", next); } catch { /* Language still works without storage. */ }
-  }
   async function copyAddress() {
     setCopyError(false);
     try {
@@ -159,12 +155,12 @@ export default function RestaurantSite({ menuPhotos = {} }: Props) {
     <div className="announcement"><span>{t("Uzbek soul. Cheongju home.", "우즈베키스탄의 맛, 청주에서.")}</span><span className="announcement-right">우즈벡할랄식당 <span>✦</span> CHEONGJU, KR</span></div>
     <header className="site-header">
       <div className="header-inner">
-        <a className="wordmark" href="#home" aria-label="BARAKA home"><Ornament /><span>BARAKA<small>UZBEK KITCHEN</small></span></a>
+        <a className="wordmark" href="#home" aria-label={t("BARAKA home", "BARAKA 홈")}><Ornament /><span>BARAKA<small>UZBEK KITCHEN</small></span></a>
         <nav className="desktop-nav" aria-label={t("Main navigation", "주 메뉴")}>{nav.map(item => <a key={item.id} href={`#${item.id}`} className={activeSection === item.id ? "active" : ""}>{item.label}</a>)}</nav>
         <div className="header-actions">
-          <div className="language-switch" aria-label={t("Language", "언어")}><button aria-pressed={language === "en"} onClick={() => changeLanguage("en")}>EN</button><span>/</span><button aria-pressed={language === "ko"} onClick={() => changeLanguage("ko")}>한국어</button></div>
+          <LanguageSwitcher />
           <a href="#reserve" className="button button-green header-book">{t("A seat at our table", "예약 문의")}<ArrowUpRight size={16} /></a>
-          <button ref={mobileToggleRef} className="mobile-toggle" aria-expanded={mobileOpen} aria-controls="mobile-navigation" aria-label={t(mobileOpen ? "Close menu" : "Open menu", mobileOpen ? "메뉴 닫기" : "메뉴 열기")} onClick={() => setMobileOpen(!mobileOpen)}>{mobileOpen ? <X /> : <Menu />}</button>
+          <button ref={mobileToggleRef} className="mobile-toggle" aria-expanded={mobileOpen} aria-controls="mobile-navigation" aria-label={mobileOpen ? t("Close menu", "메뉴 닫기") : t("Open menu", "메뉴 열기")} onClick={() => setMobileOpen(!mobileOpen)}>{mobileOpen ? <X /> : <Menu />}</button>
         </div>
       </div>
       {mobileOpen && <nav id="mobile-navigation" className="mobile-nav" aria-label={t("Mobile navigation", "모바일 메뉴")}>{nav.map(item => <a key={item.id} href={`#${item.id}`} onClick={() => setMobileOpen(false)}>{item.label}<ArrowUpRight size={20} /></a>)}<a href="#reserve" onClick={() => setMobileOpen(false)}>{t("Reserve a table", "예약 문의")}<ArrowUpRight size={20} /></a></nav>}
@@ -177,13 +173,13 @@ export default function RestaurantSite({ menuPhotos = {} }: Props) {
           <h1 id="hero-title">{t("A taste of Uzbekistan,", "우즈베키스탄의 맛,")}<br /><em>{t("in the heart of Korea.", "한국에서 만나다.")}</em></h1>
           <p className="hero-description">{t("A journey of flavour. A tradition of hospitality. Discover the warmth of Uzbek cooking, brought to your table in Cheongju.", "정성과 전통이 담긴 우즈베키스탄 요리. 실크로드의 풍성한 맛과 따뜻한 환대를 청주에서 만나보세요.")}</p>
           <div className="hero-buttons"><a className="button button-green" href="#menu">{t("Explore the menu", "메뉴 둘러보기")}<ArrowUpRight size={19} /></a>{session?.kind === "guest" && <Link className="button button-green" href="/order">{t("Order now", "주문하기")}<ArrowUpRight size={19} /></Link>}<a className="text-link" href="#reserve">{t("Reserve a table", "예약 문의")}<ArrowRight size={18} /></a></div>
-          <div className="hero-foot"><span className="hero-location"><MapPin size={18} /><span>CHEONGJU, SOUTH KOREA<small>복대동 · 산업단지 입구</small></span></span><a href="#menu" className="scroll-cue" aria-label={t("Scroll to the menu", "메뉴로 이동")}><ArrowDown size={20} /></a></div>
+          <div className="hero-foot"><span className="hero-location"><MapPin size={18} /><span>{t("CHEONGJU, SOUTH KOREA", "대한민국 청주")}<small>복대동 · 산업단지 입구</small></span></span><a href="#menu" className="scroll-cue" aria-label={t("Scroll to the menu", "메뉴로 이동")}><ArrowDown size={20} /></a></div>
         </div>
         <div className="hero-visual">
           <Ornament className="hero-ornament" />
           <div className="hero-image">{!heroFailed ? <Image src={publicAsset("/images/plov-editorial.jpg")} alt={t("Editorial photograph of Central Asian plov with lamb, rice and carrots", "양고기와 당근을 넣은 중앙아시아 플로프 참고 사진")} fill priority sizes="(max-width: 760px) 92vw, 47vw" onError={() => setHeroFailed(true)} /> : <div className="image-fallback"><Ornament /><span>BARAKA</span></div>}<div className="hero-image-shade" /><a className="hero-caption" href="#gallery"><span>{t("THE TASTE OF THE SILK ROAD · EDITORIAL IMAGE", "실크로드의 맛 · 음식 참고 사진")}<strong>{t("Osh. A tradition worth sharing.", "함께 나누는 전통, 플로프.")}</strong></span><ArrowUpRight size={25} /></a></div>
-          <div className="hero-seal"><span>UZBEK ROOTS</span><Ornament /><span>WARM HEARTS</span></div>
-          <div className="hero-side-note">GOOD FOOD. GOOD COMPANY.</div>
+          <div className="hero-seal"><span>{t("UZBEK ROOTS", "우즈베키스탄의 뿌리")}</span><Ornament /><span>{t("WARM HEARTS", "따뜻한 마음")}</span></div>
+          <div className="hero-side-note">{t("GOOD FOOD. GOOD COMPANY.", "좋은 음식. 좋은 사람들.")}</div>
         </div>
       </section>
 
@@ -191,12 +187,12 @@ export default function RestaurantSite({ menuPhotos = {} }: Props) {
 
       <section className="menu-section section-shell" id="menu" aria-labelledby="menu-title">
         <div className="section-heading"><div><p className="eyebrow">01 / {t("GOOD FOOD STARTS HERE", "맛있는 만남의 시작")}</p><h2 id="menu-title">{t("Our table.", "정성을 담은")} <em>{t("Your discovery.", "한 접시.")}</em></h2></div><p>{t("From a comforting bowl to something straight off the grill. Come hungry. Leave happy.", "따뜻한 한 그릇부터 노릇하게 구운 요리까지. 맛있는 한 끼를 만나보세요.")}</p></div>
-        <div className="menu-toolbar"><div className="category-tabs" role="group" aria-label={t("Menu categories", "메뉴 종류")}>{categories.filter(cat => cat.id === "all" || menu.some(item => item.category === cat.id)).map(cat => <button key={cat.id} onClick={() => { setCategory(cat.id); setExpanded(false); }} aria-pressed={category === cat.id} className={category === cat.id ? "selected" : ""}>{cat[language]}</button>)}</div><label className="menu-search"><Search size={17} /><span className="sr-only">{t("Search dishes", "메뉴 검색")}</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t("Find a dish…", "메뉴 검색…")} /></label></div>
+        <div className="menu-toolbar"><div className="category-tabs" role="group" aria-label={t("Menu categories", "메뉴 종류")}>{categories.filter(cat => cat.id === "all" || menu.some(item => item.category === cat.id)).map(cat => <button key={cat.id} onClick={() => { setCategory(cat.id); setExpanded(false); }} aria-pressed={category === cat.id} className={category === cat.id ? "selected" : ""}>{t(cat.en, cat.ko)}</button>)}</div><label className="menu-search"><Search size={17} /><span className="sr-only">{t("Search dishes", "메뉴 검색")}</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t("Find a dish…", "메뉴 검색…")} /></label></div>
         <div className="menu-meta"><p>{t("Menu items and listed prices are managed by the restaurant. Please confirm today’s availability before visiting.", "메뉴와 표시 가격은 매장에서 관리합니다. 방문 전 오늘 판매 여부를 확인해 주세요.")}</p><span aria-live="polite">{filteredMenu.length} {t("dishes", "메뉴")}</span></div>
         <div className="menu-grid">{visibleMenu.map(item => <div className={`menu-card-wrap ${session?.kind === "owner" ? "menu-card-owner" : ""}`} key={item.id}>
-          <button className="dish-card" onClick={() => setSelectedDish(item)} aria-label={`${t("View", "자세히 보기:")} ${language === "ko" ? item.ko : item.name}`}>
+          <button className="dish-card" onClick={() => setSelectedDish(item)} aria-label={`${t("View", "자세히 보기:")} ${localizedDish(item, language).name}`}>
             <DishPhoto item={item} path={item.image || menuPhotos[item.id]} language={language} />
-            <div className="dish-info"><div className="dish-number">{String(menu.indexOf(item) + 1).padStart(2, "0")} / <span>{language === "ko" ? item.name : item.ko}</span></div><div className="dish-title"><h3>{language === "ko" ? item.ko : item.name}</h3><ArrowUpRight size={23} /></div><p>{language === "ko" ? item.descriptionKo : item.description}</p><span className="dish-price">{item.price != null ? `₩${item.price.toLocaleString("ko-KR")}` : t("Ask us for today’s price", "가격 문의")}<small>{item.price != null ? t("menu price", "표시 가격") : ""}</small></span></div>
+            <div className="dish-info"><div className="dish-number">{String(menu.indexOf(item) + 1).padStart(2, "0")} / <span>{language === "ko" ? item.name : item.ko}</span></div><div className="dish-title"><h3>{localizedDish(item, language).name}</h3><ArrowUpRight size={23} /></div><p>{localizedDish(item, language).description}</p><span className="dish-price">{item.price != null ? `₩${item.price.toLocaleString("ko-KR")}` : t("Ask us for today’s price", "가격 문의")}<small>{item.price != null ? t("menu price", "표시 가격") : ""}</small></span></div>
           </button>
           {session?.kind === "owner" && <>
             <a className="owner-dish-edit" href={`/admin/menu?item=${encodeURIComponent(item.id)}`}>{t("Edit dish","메뉴 수정")}</a>
@@ -205,13 +201,13 @@ export default function RestaurantSite({ menuPhotos = {} }: Props) {
           </>}
         </div>)}</div>
         {filteredMenu.length === 0 && <div className="empty-menu"><Search size={32} /><h3>{t("No dishes found", "검색 결과가 없습니다")}</h3><p>{t("Try another name or explore the whole menu.", "다른 이름을 검색하거나 전체 메뉴를 확인해 보세요.")}</p><button className="button button-outline" onClick={() => { setQuery(""); setCategory("all"); }}>{t("See all dishes", "전체 메뉴 보기")}</button></div>}
-        {category === "all" && !query.trim() && filteredMenu.length > 6 && <div className="menu-more"><button className="button button-outline" onClick={() => setExpanded(!expanded)}>{expanded ? t("Show fewer dishes", "간단히 보기") : t(`Explore all ${menu.length} dishes`, `전체 ${menu.length}개 메뉴 보기`)}<ChevronDown size={18} className={expanded ? "rotate" : ""} /></button></div>}
+        {category === "all" && !query.trim() && filteredMenu.length > 6 && <div className="menu-more"><button className="button button-outline" onClick={() => setExpanded(!expanded)}>{expanded ? t("Show fewer dishes", "간단히 보기") : t("Explore all {count} dishes", "전체 {count}개 메뉴 보기").replace("{count}", String(menu.length))}<ChevronDown size={18} className={expanded ? "rotate" : ""} /></button></div>}
         <p className="allergy-note">{t("Something we should know? Please tell us about allergies or dietary needs before ordering.", "알레르기나 식이 제한이 있으신가요? 주문 전에 직원에게 꼭 알려주세요.")}</p>
       </section>
 
-      <section className="story-section" id="story" aria-labelledby="story-title"><div className="story-inner section-shell"><div className="story-art" aria-hidden="true"><div className="story-arch"><Ornament /><span>BARAKA</span><small>O‘ZBEK TAOMLARI</small></div><span className="story-art-caption">A LITTLE TASTE OF HOME</span></div><div className="story-copy"><p className="eyebrow">02 / {t("A PLACE TO COME TOGETHER", "함께하는 공간")}</p><h2 id="story-title">{t("From Uzbekistan,", "우즈베키스탄에서,")}<br /><em>{t("with warmth.", "당신의 식탁까지.")}</em></h2><p>{t("Some of the best moments happen around a table. Bread is passed, stories are shared, and there is always room for one more.", "좋은 순간은 식탁에서 시작됩니다. 빵을 나누고, 이야기를 나누고, 서로를 위한 자리를 내어주는 곳.")}</p><p>{t("That is the feeling we want you to find at BARAKA. Uzbek flavours, a generous spirit, and a little corner of Cheongju to make yourself at home.", "BARAKA에서 그런 편안함을 느끼셨으면 합니다. 우즈베키스탄의 맛과 넉넉한 마음이 있는 청주의 작은 공간입니다.")}</p><a href="#reserve" className="text-link">{t("Let’s make a plan", "만날 날을 정해볼까요")}<ArrowUpRight size={20} /></a></div></div></section>
+      <section className="story-section" id="story" aria-labelledby="story-title"><div className="story-inner section-shell"><div className="story-art" aria-hidden="true"><div className="story-arch"><Ornament /><span>BARAKA</span><small>O‘ZBEK TAOMLARI</small></div><span className="story-art-caption">{t("A LITTLE TASTE OF HOME", "고향의 맛 한 조각")}</span></div><div className="story-copy"><p className="eyebrow">02 / {t("A PLACE TO COME TOGETHER", "함께하는 공간")}</p><h2 id="story-title">{t("From Uzbekistan,", "우즈베키스탄에서,")}<br /><em>{t("with warmth.", "당신의 식탁까지.")}</em></h2><p>{t("Some of the best moments happen around a table. Bread is passed, stories are shared, and there is always room for one more.", "좋은 순간은 식탁에서 시작됩니다. 빵을 나누고, 이야기를 나누고, 서로를 위한 자리를 내어주는 곳.")}</p><p>{t("That is the feeling we want you to find at BARAKA. Uzbek flavours, a generous spirit, and a little corner of Cheongju to make yourself at home.", "BARAKA에서 그런 편안함을 느끼셨으면 합니다. 우즈베키스탄의 맛과 넉넉한 마음이 있는 청주의 작은 공간입니다.")}</p><a href="#reserve" className="text-link">{t("Let’s make a plan", "만날 날을 정해볼까요")}<ArrowUpRight size={20} /></a></div></div></section>
 
-      <section className="chef-section section-shell" id="chef" aria-labelledby="chef-title"><div className="chef-photo-wrap"><div className="chef-photo">{!chefFailed ? <Image src={publicAsset("/images/chef.jpg")} alt={t("Chef Asr working in his kitchen", "주방에서 요리하는 셰프 Asr")} fill sizes="(max-width: 760px) 90vw, 45vw" onError={() => setChefFailed(true)} /> : <div className="image-fallback"><Utensils size={64} /><span>Chef Asr</span></div>}</div><a href="https://www.instagram.com/p/DbXglYOTsDc/" target="_blank" rel="noopener noreferrer" className="chef-photo-credit"><Instagram size={15} />{t("A moment in the kitchen", "주방에서의 한 순간")}<ArrowUpRight size={16} /></a><div className="chef-photo-tag">THE HANDS.<br />THE HEART.<br /><em>THE CHEF.</em></div></div><div className="chef-copy"><p className="eyebrow">03 / {t("MEET THE PERSON BEHIND THE PLATE", "요리 뒤에 있는 사람")}</p><h2 id="chef-title">{t("Good food has", "좋은 음식에는")}<br /><em>{t("a human touch.", "사람의 온기가.")}</em></h2><div className="chef-name"><h3>{restaurant.chefName}</h3><span>CHEF DE CUISINE</span></div><p>{t("Meet Chef Asr. His kitchen brings together Uzbek and European cooking, with a love for the craft that shows up in every step.", "셰프 Asr를 소개합니다. 우즈베키스탄과 유럽 요리를 선보이며, 요리의 매 순간에 정성을 담습니다.")}</p><p>{t("Get to know the person behind your next meal: the preparation, the fire, and the everyday life of a chef in Korea.", "요리 준비부터 불 앞에서의 순간까지. 한국에서 요리하는 셰프의 일상을 만나보세요.")}</p><a className="button button-outline" href={restaurant.instagram} target="_blank" rel="noopener noreferrer"><Instagram size={18} />@asr.chef<ArrowUpRight size={18} /></a><div className="chef-signature">Asr<span>{t("From my kitchen, with heart.", "제 주방에서, 마음을 담아.")}</span></div></div></section>
+      <section className="chef-section section-shell" id="chef" aria-labelledby="chef-title"><div className="chef-photo-wrap"><div className="chef-photo">{!chefFailed ? <Image src={publicAsset("/images/chef.jpg")} alt={t("Chef Asr working in his kitchen", "주방에서 요리하는 셰프 Asr")} fill sizes="(max-width: 760px) 90vw, 45vw" onError={() => setChefFailed(true)} /> : <div className="image-fallback"><Utensils size={64} /><span>Chef Asr</span></div>}</div><a href="https://www.instagram.com/p/DbXglYOTsDc/" target="_blank" rel="noopener noreferrer" className="chef-photo-credit"><Instagram size={15} />{t("A moment in the kitchen", "주방에서의 한 순간")}<ArrowUpRight size={16} /></a><div className="chef-photo-tag">{t("THE HANDS.", "손길.")}<br />{t("THE HEART.", "마음.")}<br /><em>{t("THE CHEF.", "셰프.")}</em></div></div><div className="chef-copy"><p className="eyebrow">03 / {t("MEET THE PERSON BEHIND THE PLATE", "요리 뒤에 있는 사람")}</p><h2 id="chef-title">{t("Good food has", "좋은 음식에는")}<br /><em>{t("a human touch.", "사람의 온기가.")}</em></h2><div className="chef-name"><h3>{restaurant.chefName}</h3><span>{t("CHEF DE CUISINE", "총괄 셰프")}</span></div><p>{t("Meet Chef Asr. His kitchen brings together Uzbek and European cooking, with a love for the craft that shows up in every step.", "셰프 Asr를 소개합니다. 우즈베키스탄과 유럽 요리를 선보이며, 요리의 매 순간에 정성을 담습니다.")}</p><p>{t("Get to know the person behind your next meal: the preparation, the fire, and the everyday life of a chef in Korea.", "요리 준비부터 불 앞에서의 순간까지. 한국에서 요리하는 셰프의 일상을 만나보세요.")}</p><a className="button button-outline" href={restaurant.instagram} target="_blank" rel="noopener noreferrer"><Instagram size={18} />@asr.chef<ArrowUpRight size={18} /></a><div className="chef-signature">Asr<span>{t("From my kitchen, with heart.", "제 주방에서, 마음을 담아.")}</span></div></div></section>
 
       <SilkRoadSections language={language} />
 
@@ -220,11 +216,11 @@ export default function RestaurantSite({ menuPhotos = {} }: Props) {
       <section className="reservation-section section-shell" id="reserve" aria-label={t("Reservation requests", "예약 문의")}><p className="eyebrow">05 / {t("THERE’S A PLACE FOR YOU", "당신을 위한 자리")}</p><ReservationForm language={language} phone={restaurant.phone} instagramUrl={restaurant.instagram} /></section>
     </main>
 
-    <footer className="site-footer"><div className="section-shell"><div className="footer-top"><a href="#home" className="wordmark"><Ornament /><span>BARAKA<small>UZBEK KITCHEN · CHEONGJU</small></span></a><p>{t("Come for the food.", "맛있는 음식을 찾아,")}<br /><em>{t("Stay for the feeling.", "따뜻한 마음을 만나.")}</em></p><a className="footer-instagram" href={restaurant.instagram} target="_blank" rel="noopener noreferrer" aria-label="Chef Asr on Instagram"><Instagram size={25} /><ArrowUpRight size={17} /></a></div><div className="footer-bottom"><span>© {new Date().getFullYear()} BARAKA. {t("Made with heart.", "마음을 담아.")}</span><a href={restaurant.phoneHref}>{restaurant.phone}</a><a href={restaurant.naverPlace} target="_blank" rel="noopener noreferrer">우즈벡할랄식당 <ArrowUpRight size={13} /></a><a href="#home">{t("Back to the top", "맨 위로")} ↑</a></div></div></footer>
+    <footer className="site-footer"><div className="section-shell"><div className="footer-top"><a href="#home" className="wordmark"><Ornament /><span>BARAKA<small>UZBEK KITCHEN · CHEONGJU</small></span></a><p>{t("Come for the food.", "맛있는 음식을 찾아,")}<br /><em>{t("Stay for the feeling.", "따뜻한 마음을 만나.")}</em></p><a className="footer-instagram" href={restaurant.instagram} target="_blank" rel="noopener noreferrer" aria-label={t("Chef Asr on Instagram", "셰프 Asr 인스타그램")}><Instagram size={25} /><ArrowUpRight size={17} /></a></div><div className="footer-bottom"><span>© {new Date().getFullYear()} BARAKA. {t("Made with heart.", "마음을 담아.")}</span><a href={restaurant.phoneHref}>{restaurant.phone}</a><a href={restaurant.naverPlace} target="_blank" rel="noopener noreferrer">우즈벡할랄식당 <ArrowUpRight size={13} /></a><a href="#home">{t("Back to the top", "맨 위로")} ↑</a></div></div></footer>
     <div className="mobile-bottom-bar"><a href={restaurant.phoneHref}><Phone size={17} />{t("Call us", "전화")}</a><a href={restaurant.naverMap} target="_blank" rel="noopener noreferrer"><MapPin size={17} />{t("Directions", "길 찾기")}</a><a href="#reserve">{t("Reserve", "예약 문의")}<ArrowUpRight size={17} /></a></div>
 
     <dialog ref={dialogRef} className="dish-dialog" aria-labelledby="dish-dialog-title" onCancel={() => setSelectedDish(null)} onClose={() => setSelectedDish(null)} onClick={event => { if (event.target === event.currentTarget) setSelectedDish(null); }}>
-      {selectedDish && <div className="dish-dialog-inner"><button className="dialog-close" onClick={() => setSelectedDish(null)} aria-label={t("Close dish details", "메뉴 상세 닫기")} autoFocus><X size={22} /></button><DishPhoto item={selectedDish} path={selectedDish.image || menuPhotos[selectedDish.id]} language={language} /><div className="dish-dialog-copy"><p className="eyebrow">{language === "ko" ? selectedDish.name : selectedDish.ko}</p><h2 id="dish-dialog-title">{language === "ko" ? selectedDish.ko : selectedDish.name}</h2><p>{language === "ko" ? selectedDish.descriptionKo : selectedDish.description}</p>{selectedDish.price != null && <strong className="dialog-price">₩{selectedDish.price.toLocaleString("ko-KR")}</strong>}<p className="dialog-note">{t("Listed prices are managed by the restaurant. Call to confirm today’s availability, ingredients, and dietary needs.", "표시 가격은 매장에서 관리합니다. 오늘 판매 여부, 재료 및 알레르기 정보는 전화로 확인해 주세요.")}</p><a className="button button-green" href={restaurant.phoneHref}><Phone size={18} />{t("Ask us about this dish", "메뉴 전화 문의")}<ArrowUpRight size={18} /></a></div></div>}
+      {selectedDish && <div className="dish-dialog-inner"><button className="dialog-close" onClick={() => setSelectedDish(null)} aria-label={t("Close dish details", "메뉴 상세 닫기")} autoFocus><X size={22} /></button><DishPhoto item={selectedDish} path={selectedDish.image || menuPhotos[selectedDish.id]} language={language} /><div className="dish-dialog-copy"><p className="eyebrow">{language === "ko" ? selectedDish.name : selectedDish.ko}</p><h2 id="dish-dialog-title">{localizedDish(selectedDish, language).name}</h2><p>{localizedDish(selectedDish, language).description}</p>{selectedDish.price != null && <strong className="dialog-price">₩{selectedDish.price.toLocaleString("ko-KR")}</strong>}<p className="dialog-note">{t("Listed prices are managed by the restaurant. Call to confirm today’s availability, ingredients, and dietary needs.", "표시 가격은 매장에서 관리합니다. 오늘 판매 여부, 재료 및 알레르기 정보는 전화로 확인해 주세요.")}</p><a className="button button-green" href={restaurant.phoneHref}><Phone size={18} />{t("Ask us about this dish", "메뉴 전화 문의")}<ArrowUpRight size={18} /></a></div></div>}
     </dialog>
   </>;
 }

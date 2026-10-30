@@ -1,3 +1,4 @@
+import { SiteLanguageProvider } from "@/components/SiteLanguage";
 import EntryGate from "@/components/EntryGate";
 /* eslint-disable @next/next/no-page-custom-font */
 import "./globals.css";
@@ -42,7 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }} />
       </head>
-      <body><EntryGate>{children}</EntryGate></body>
+      <body><SiteLanguageProvider><EntryGate>{children}</EntryGate></SiteLanguageProvider></body>
     </html>
   );
 }

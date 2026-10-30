@@ -1,11 +1,13 @@
 "use client";
 import { FormEvent, useState } from "react";
+import LanguageSwitcher, { useSiteLanguage } from "./SiteLanguage";
 import Link from "next/link";
 import { useEntrySession } from "./EntryGate";
 import { apiFetch, demoAuthEnabled } from "@/lib/client/api";
 
 export default function GuestProfile() {
   const { session, setSession } = useEntrySession();
+  const { t } = useSiteLanguage();
   const [name, setName] = useState(session?.displayName || ""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -13,10 +15,11 @@ export default function GuestProfile() {
     return (
       <main className="entry-screen">
         <section className="entry-card">
-          <p className="eyebrow">DEMO ONLY</p>
-          <h1>Guest profiles are not saved</h1>
-          <p>This public demo login stores only the demo account name in this browser. Editing a real guest profile requires server-side storage.</p>
-          <Link className="button button-green" href="/">Return to the restaurant</Link>
+          <LanguageSwitcher />
+          <p className="eyebrow">{t("DEMO ONLY")}</p>
+          <h1>{t("Guest profiles are not saved")}</h1>
+          <p>{t("This public demo login stores only the demo account name in this browser. Editing a real guest profile requires server-side storage.")}</p>
+          <Link className="button button-green" href="/">{t("Return to the restaurant")}</Link>
         </section>
       </main>
     );
@@ -24,9 +27,10 @@ export default function GuestProfile() {
     return (
       <main className="entry-screen">
         <section className="entry-card">
-          <h1>Guest profile</h1>
-          <p>This page is for guest accounts.</p>
-          <Link href="/">Return to the restaurant</Link>
+          <LanguageSwitcher />
+          <h1>{t("Guest profile")}</h1>
+          <p>{t("This page is for guest accounts.")}</p>
+          <Link href="/">{t("Return to the restaurant")}</Link>
         </section>
       </main>
     );
@@ -67,16 +71,15 @@ export default function GuestProfile() {
   return (
     <main className="entry-screen">
       <section className="entry-card">
-        <p className="eyebrow">YOUR PLACE AT BARAKA</p>
-        <h1>What should we call you?</h1>
+          <LanguageSwitcher />
+        <p className="eyebrow">{t("YOUR PLACE AT BARAKA")}</p>
+        <h1>{t("What should we call you?")}</h1>
         <p>
-          Your default name is <strong>{defaultName}</strong>. Keep it or choose
-          a name for your reservations.
+          {t("Your default name is {name}. Keep it or choose a name for your reservations.").replace("{name}", defaultName)}
         </p>
         <form className="admin-login" onSubmit={(e) => void save(e)}>
           <label htmlFor="guest-display-name">
-            Your name
-            <input
+            {t("Your name")}<input
               id="guest-display-name"
               name="displayName"
               value={name}
@@ -88,22 +91,19 @@ export default function GuestProfile() {
             />
           </label>
           <button disabled={busy}>
-            {busy ? "Saving…" : "Save name & continue"}
+            {busy ? t("Saving…") : t("Save name & continue")}
           </button>
           <button
             type="button"
             disabled={busy}
             onClick={() => void save(undefined, true)}
           >
-            Use {defaultName}
+            {t("Use {name}").replace("{name}", defaultName)}
           </button>
         </form>
-        <p role="alert">{error}</p>
+        <p role="alert">{t(error)}</p>
         <small>
-          You can change this later using “Edit name.” Your guest number stays
-          the same for this session. Numbering restarts each day at midnight in Korea. The name appears in your reservation and the restaurant’s
-          private records.
-        </small>
+          {t("You can change this later using “Edit name.” Your guest number stays the same for this session. Numbering restarts each day at midnight in Korea. The name appears in your reservation and the restaurant’s private records.")}</small>
       </section>
     </main>
   );

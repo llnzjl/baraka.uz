@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
-    "test": "tsx --test tests/booking.unit.test.ts",
+    "test": "tsx --test tests/booking.unit.test.ts tests/site-language.test.ts",
     "test:db": "node scripts/test-sqlite.mjs",
     "test:integration": "node --env-file=.env.test.local --import tsx --test tests/booking.integration.test.ts",
     "test:postgres": "node scripts/test-database.mjs",
